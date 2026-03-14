@@ -1,24 +1,49 @@
 import SwiftUI
 import ServiceManagement
 
-/// A single account row with remove button
+/// A single account row with disable toggle and remove button
 struct AccountRowView: View {
     let account: AuthAccount
     let removeColor: Color
+    let showDisableToggle: Bool
+    let isLastEnabled: Bool
+    let onToggleDisabled: () -> Void
     let onRemove: () -> Void
     
     var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(account.isExpired ? Color.orange : Color.green)
+                .fill(account.isDisabled ? Color.gray : (account.isExpired ? Color.orange : Color.green))
                 .frame(width: 6, height: 6)
             Text(account.displayName)
                 .font(.caption)
-                .foregroundColor(account.isExpired ? .orange : .secondary)
-            if account.isExpired {
+                .foregroundColor(account.isDisabled ? .secondary.opacity(0.5) : (account.isExpired ? .orange : .secondary))
+                .strikethrough(account.isDisabled)
+            if account.isExpired && !account.isDisabled {
                 Text("(expired)")
                     .font(.caption2)
                     .foregroundColor(.orange)
+            }
+            if account.isDisabled {
+                Text("(disabled)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            if showDisableToggle {
+                let canDisable = account.isDisabled || !isLastEnabled
+                Button(action: onToggleDisabled) {
+                    Text(account.isDisabled ? "Enable" : "Disable")
+                        .font(.caption)
+                        .foregroundColor(account.isDisabled ? .green : (canDisable ? .orange : .secondary.opacity(0.4)))
+                }
+                .buttonStyle(.plain)
+                .disabled(!canDisable)
+                .help(!canDisable ? "At least one account must remain enabled" : "")
+                .onHover { inside in
+                    if canDisable {
+                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                }
             }
             Button(action: onRemove) {
                 HStack(spacing: 2) {
@@ -30,7 +55,6 @@ struct AccountRowView: View {
                 .foregroundColor(removeColor)
             }
             .buttonStyle(.plain)
-            .padding(.leading, 8)
             .onHover { inside in
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
@@ -96,6 +120,7 @@ struct ServiceRow<ExtraContent: View>: View {
     let customTitle: String?
     let onConnect: () -> Void
     let onDisconnect: (AuthAccount) -> Void
+    let onToggleDisabled: (AuthAccount) -> Void
     let onToggleEnabled: (Bool) -> Void
     var onExpandChange: ((Bool) -> Void)? = nil
     @ViewBuilder var extraContent: () -> ExtraContent
@@ -150,6 +175,7 @@ struct ServiceRow<ExtraContent: View>: View {
             
             // Account display (only shown when enabled)
             if isEnabled {
+                let enabledCount = accounts.filter { !$0.isDisabled }.count
                 if !accounts.isEmpty {
                     // Collapsible summary
                     HStack(spacing: 4) {
@@ -157,7 +183,7 @@ struct ServiceRow<ExtraContent: View>: View {
                             .font(.caption)
                             .foregroundColor(.green)
 
-                        if accounts.count > 1 {
+                        if enabledCount > 1 {
                             Text("• Round-robin w/ auto-failover")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -179,7 +205,9 @@ struct ServiceRow<ExtraContent: View>: View {
                     if isExpanded {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(accounts) { account in
-                                AccountRowView(account: account, removeColor: removeColor) {
+                                AccountRowView(account: account, removeColor: removeColor, showDisableToggle: accounts.count > 1, isLastEnabled: !account.isDisabled && enabledCount <= 1, onToggleDisabled: {
+                                    onToggleDisabled(account)
+                                }) {
                                     accountToRemove = account
                                     showingRemoveConfirmation = true
                                 }
@@ -308,6 +336,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { connectService(.antigravity) },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("antigravity", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -322,6 +351,7 @@ struct SettingsView: View {
                         customTitle: serverManager.vercelGatewayEnabled && !serverManager.vercelApiKey.isEmpty ? "Claude Code (via Vercel)" : nil,
                         onConnect: { connectService(.claude) },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("claude", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) {
@@ -338,6 +368,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { connectService(.codex) },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("codex", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -352,6 +383,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { connectService(.gemini) },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("gemini", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -366,6 +398,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { connectService(.copilot) },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("github-copilot", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -380,6 +413,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { showingQwenEmailPrompt = true },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("qwen", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -394,6 +428,7 @@ struct SettingsView: View {
                         customTitle: nil,
                         onConnect: { showingZaiApiKeyPrompt = true },
                         onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("zai", enabled: enabled) },
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
@@ -520,6 +555,20 @@ struct SettingsView: View {
     }
 
     // MARK: - Actions
+    
+    private func toggleAccountDisabled(_ account: AuthAccount) {
+        if authManager.toggleAccountDisabled(account) {
+            authResultSuccess = true
+            authResultMessage = account.isDisabled
+                ? "✓ Enabled \(account.displayName)"
+                : "✓ Disabled \(account.displayName)"
+            showingAuthResult = true
+        } else {
+            authResultSuccess = false
+            authResultMessage = "Failed to update \(account.displayName). Please try again."
+            showingAuthResult = true
+        }
+    }
     
     private func openAuthFolder() {
         let authDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cli-proxy-api")

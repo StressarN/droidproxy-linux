@@ -30,6 +30,7 @@ struct AuthAccount: Identifiable, Equatable {
     let type: ServiceType
     let expired: Date?
     let filePath: URL
+    let isDisabled: Bool
     
     var isExpired: Bool {
         guard let expired = expired else { return false }
@@ -124,13 +125,16 @@ class AuthManager: ObservableObject {
                     }
                 }
                 
+                let isDisabled = json["disabled"] as? Bool ?? false
+                
                 let account = AuthAccount(
                     id: file.lastPathComponent,
                     email: email,
                     login: login,
                     type: serviceType,
                     expired: expiredDate,
-                    filePath: file
+                    filePath: file,
+                    isDisabled: isDisabled
                 )
                 
                 newAccounts[serviceType]?.append(account)
@@ -153,6 +157,34 @@ class AuthManager: ObservableObject {
                     self.serviceAccounts[type] = ServiceAccounts(type: type)
                 }
             }
+        }
+    }
+    
+    /// Toggle the disabled state of a specific account's auth file
+    func toggleAccountDisabled(_ account: AuthAccount) -> Bool {
+        do {
+            let data = try Data(contentsOf: account.filePath)
+            guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                NSLog("[AuthStatus] Failed to parse auth file as JSON: %@", account.filePath.path)
+                return false
+            }
+            let currentlyDisabled = json["disabled"] as? Bool ?? false
+            if !currentlyDisabled {
+                let enabledCount = serviceAccounts[account.type]?.accounts.filter { !$0.isDisabled }.count ?? 0
+                guard enabledCount > 1 else {
+                    NSLog("[AuthStatus] Refusing to disable last enabled account for %@", account.type.rawValue)
+                    return false
+                }
+            }
+            json["disabled"] = !currentlyDisabled
+            let updatedData = try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
+            try updatedData.write(to: account.filePath, options: .atomic)
+            NSLog("[AuthStatus] Toggled disabled=%d for: %@", !currentlyDisabled, account.filePath.path)
+            checkAuthStatus()
+            return true
+        } catch {
+            NSLog("[AuthStatus] Failed to toggle disabled state: %@", error.localizedDescription)
+            return false
         }
     }
     
