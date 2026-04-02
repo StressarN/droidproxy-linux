@@ -2,19 +2,21 @@
 
 ## Build & Run
 
+The Swift package lives in `src/`. Run all `swift build`, `swift run`, and `swift package` commands from there, not from the repo root.
+
 ```bash
-# Debug build (Swift)
+# Debug build
 cd src && swift build
 
-# Release build + code-signed .app bundle
-# Picks up CODESIGN_IDENTITY and APP_VERSION from env, or auto-detects
-./create-app-bundle.sh
+# Run from source
+cd src && swift run
 
-# Release build + signed + zipped for distribution
-./scripts/create-release.sh <version>
+# Release .app bundle at repo root
+# Picks up CODESIGN_IDENTITY / APP_VERSION / TARGET_ARCH from env when present
+./create-app-bundle.sh
 ```
 
-The Swift package lives in `src/` (not the repo root). All `swift build` / `swift package` commands must run from there.
+`create-app-bundle.sh` currently builds `DroidProxy.app` at the repo root and bundles resources from `src/Sources/Resources/`.
 
 ### Notarization (local)
 
@@ -30,58 +32,111 @@ xcrun stapler staple "DroidProxy.app"
 src/.build/artifacts/sparkle/Sparkle/bin/sign_update DroidProxy-arm64.zip
 ```
 
-Reads the EdDSA private key from the system keychain automatically.
+## Source Of Truth
+
+The compiled app code is under `src/`. Treat `src/Sources/**`, `src/Info.plist`, and `create-app-bundle.sh` as source of truth.
+
+There is also a top-level `resources/` tree containing mirrored Swift files and assets. It is not the SwiftPM target used by `src/Package.swift`, so do not assume edits there affect the app unless the task is explicitly about that directory.
 
 ## Architecture
 
-DroidProxy is a macOS menu bar app (LSUIElement) that runs two local servers:
+DroidProxy is a macOS menu bar app (`LSUIElement`) with:
 
-1. **ThinkingProxy** (port 8317) -- A raw TCP proxy written with NWListener/NWConnection. This is the user-facing endpoint. It intercepts Anthropic API requests, parses `-thinking-N` model name suffixes, and injects `thinking`, `output_config`, and `anthropic-beta` headers before forwarding to the backend. Also handles Amp CLI path rewriting and management request forwarding to ampcode.com.
+1. `ThinkingProxy` on `localhost:8317`, the user-facing TCP proxy.
+2. Bundled `CLIProxyAPIPlus` on `127.0.0.1:8318`, managed as a child process by `ServerManager`.
 
-2. **CLIProxyAPIPlus** (port 8318) -- A bundled Go binary (`src/Sources/Resources/cli-proxy-api-plus`) that handles OAuth token management, provider routing, and the actual upstream API calls. Managed as a child process by `ServerManager`.
+Typical request flow:
 
-Request flow: `Client :8317 → ThinkingProxy (transform) → CLIProxyAPI :8318 → Anthropic/upstream`
+`Client -> :8317 ThinkingProxy -> :8318 CLIProxyAPIPlus -> upstream provider`
 
-### Key files
+### Current ThinkingProxy behavior
+
+`ThinkingProxy.swift` no longer implements the old `-thinking-N` suffix parser described in older docs.
+
+What it does today:
+
+- Inspects `POST` JSON requests for supported Claude and Codex GPT models
+- Injects Claude adaptive thinking for models whose name contains `opus-4-6` or `sonnet-4-6`
+- Injects `"thinking":{"type":"adaptive"}`
+- Injects `"output_config":{"effort":"..."}`
+- Reads effort from `AppPreferences.opus46ThinkingEffort` or `AppPreferences.sonnet46ThinkingEffort`
+- Injects Codex reasoning for exact models `gpt-5.3-codex` and `gpt-5.4`
+- Injects `"reasoning":{"effort":"..."}`
+- Reads effort from `AppPreferences.gpt53CodexReasoningEffort` or `AppPreferences.gpt54ReasoningEffort`
+- Preserves JSON key order by editing the raw JSON string instead of re-serializing
+
+What it does not do anymore:
+
+- It does not strip or normalize model suffixes
+- It does not add fixed-budget thinking via `budget_tokens`
+- It does not add `anthropic-beta` interleaved-thinking headers
+- It does not implement the old Opus 4.7 / Sonnet 4.7 branching documented in stale docs
+
+### Amp routing
+
+`ThinkingProxy` also handles Amp-specific routing:
+
+- `/auth/cli-login` and `/api/auth/cli-login` are redirected directly to `https://ampcode.com/...`
+- `/provider/*` is rewritten to `/api/provider/*`
+- Requests that are not provider requests and not `/v1/*` or `/api/v1/*` are treated as Amp management requests and forwarded to `ampcode.com`
+- Amp response `Location` headers and cookie domains are rewritten so browser flows continue working through localhost
+
+## Auth And Providers
+
+The current app/UI only exposes two provider types:
+
+- `claude`
+- `codex`
+
+Auth data lives in `~/.cli-proxy-api/` as JSON files. `AuthManager` scans that directory and reads fields like:
+
+- `type`
+- `email`
+- `login`
+- `expired`
+- `disabled`
+
+Behavior to know:
+
+- Multiple accounts per provider are supported
+- Per-account disable/enable is supported via the `disabled` field in each auth JSON
+- The last enabled account for a provider cannot be disabled
+- Provider-level toggles in `SettingsView` are separate from per-account disable flags
+- Provider-level disable writes `oauth-excluded-models` into `~/.cli-proxy-api/merged-config.yaml`
+- `CLIProxyAPIPlus` hot-reloads config changes, so provider enable/disable does not require a restart
+- The app watches `~/.cli-proxy-api/` for changes from both `AppDelegate` and `SettingsView`
+
+## Key Files
 
 | File | Role |
 |---|---|
-| `ThinkingProxy.swift` | The HTTP proxy that does all request/response transformation. Surgical JSON string manipulation (not re-serialization) to preserve Anthropic prompt cache key ordering. |
-| `ServerManager.swift` | Lifecycle management for the CLIProxyAPIPlus child process. Handles start/stop, orphan cleanup, config merging, provider enable/disable. |
-| `AppDelegate.swift` | Menu bar UI, window management, Sparkle updater, auth directory monitoring. |
-| `SettingsView.swift` | SwiftUI settings panel -- auth status, provider toggles, server controls. |
-| `AuthStatus.swift` | Scans `~/.cli-proxy-api/*.json` for OAuth credential files, tracks expiry per account. |
-| `AppPreferences.swift` | UserDefaults-backed preferences (e.g. `forceMaxOpus46Effort`). |
-| `config.yaml` | CLIProxyAPIPlus server config. Merged at runtime with provider exclusions into `~/.cli-proxy-api/merged-config.yaml`. |
-
-### Model suffix convention
-
-Model names use suffixes to control thinking behavior:
-- `claude-opus-4-6-thinking-128000` -- adaptive thinking, 128K budget
-- `claude-opus-4-6-thinking-128000-max` -- adaptive thinking, max effort
-- `claude-sonnet-4-5-20250929-thinking-5000` -- fixed budget thinking
-
-ThinkingProxy strips the suffix, sets the clean model name, and injects the appropriate `thinking` and `output_config` JSON fields.
-
-### Adaptive vs fixed thinking
-
-Models containing `opus-4-6`, `opus-4-7`, `sonnet-4-6`, `sonnet-4-7` use adaptive thinking (`"type":"adaptive"`) with an `output_config.effort` field. All other Claude models use fixed budget thinking (`"type":"enabled","budget_tokens":N`). The interleaved thinking beta header is added for all thinking models except Opus 4.6.
-
-## Release process
-
-Releases go to `github.com/anand-92/droidproxy`. The CI workflow (`.github/workflows/release.yml`) triggers on `v*` tags and handles build/sign/notarize/DMG/Sparkle signing/GitHub release automatically. For manual local releases:
-
-1. Build: `./create-app-bundle.sh`
-2. Notarize the .app
-3. Create ZIP and DMG artifacts
-4. Sign ZIP with Sparkle's `sign_update`
-5. Update `appcast.xml` with new version entry (Sparkle auto-update feed)
-6. Tag, push, create GitHub release with artifacts
+| `src/Sources/AppDelegate.swift` | App lifecycle, menu bar UI, settings window, notifications, Sparkle updater, auth-directory watcher, startup ordering for the two local servers. |
+| `src/Sources/ServerManager.swift` | Starts/stops bundled `cli-proxy-api-plus`, captures logs, merges config, handles provider enable/disable, runs Claude/Codex login commands, and kills orphaned backend processes. |
+| `src/Sources/ThinkingProxy.swift` | Raw TCP HTTP proxy for thinking injection plus Amp request/response rewriting. |
+| `src/Sources/SettingsView.swift` | SwiftUI settings UI for server status, launch-at-login, provider toggles, auth flows, and per-model effort pickers. |
+| `src/Sources/AuthStatus.swift` | `AuthManager`, account parsing, expiry detection, file deletion, and per-account disabled-state updates. |
+| `src/Sources/AppPreferences.swift` | UserDefaults-backed effort preferences for Opus 4.6, Sonnet 4.6, GPT 5.3 Codex, and GPT 5.4. |
+| `src/Sources/Resources/config.yaml` | Bundled CLIProxyAPIPlus config (`port: 8318`, localhost binding, Amp upstream settings, auth dir). |
+| `src/Info.plist` | Bundle metadata. Current source-of-truth values include app name `DroidProxy`, bundle ID `com.droidproxy.app`, and Sparkle feed URL on `anand-92/droidproxy`. |
 
 ## Conventions
 
-- Logging uses `NSLog` throughout (not `os_log` or `print`)
-- JSON modification in ThinkingProxy uses surgical string replacement (regex) instead of parse-serialize to preserve key ordering for Anthropic prompt cache compatibility
-- The app bundle name is `DroidProxy.app`, the Swift target is `CLIProxyMenuBar`, the bundle ID is `com.droidproxy.app`
-- Auth credentials live in `~/.cli-proxy-api/` as JSON files with a `type` field (e.g. `"claude"`)
-- Config hot-reload: CLIProxyAPIPlus watches `config.yaml` for changes, so provider enable/disable takes effect without restart
+- Use `NSLog`, not `print` or `os_log`
+- Prefer updating the app under `src/`, not the mirrored top-level `resources/` directory
+- Treat `DroidProxy.app`, `CLIProxyMenuBar`, and `com.droidproxy.app` as the active app identity
+- `CLIProxyAPIPlus` is bundled as `src/Sources/Resources/cli-proxy-api-plus`
+- `ThinkingProxy` uses surgical string insertion for JSON edits to preserve cache-sensitive key ordering
+- Local backend traffic is intended to stay on localhost only (`127.0.0.1:8318`)
+- `TunnelManager.swift` exists in `src/Sources/` but is currently not wired into the app flow
+
+## Release Notes For Agents
+
+The repo still contains stale VibeProxy-era references outside the active runtime path. Before changing release automation, double-check names and URLs against current files.
+
+Known drift includes some combinations of:
+
+- `Makefile`
+- `scripts/create-release.sh`
+- `.github/workflows/release.yml`
+
+Those files still reference old names like `VibeProxy.app`, `automazeio/vibeproxy`, and legacy appcast URLs in places. If a task touches release tooling, audit it carefully instead of trusting the existing wording.

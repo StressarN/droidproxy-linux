@@ -14,41 +14,42 @@ NC='\033[0m'
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION=${1:-"dev"}
+APP_NAME="DroidProxy"
 
-echo -e "${BLUE}📦 Creating VibeProxy Release ${VERSION}${NC}"
+echo -e "${BLUE}📦 Creating ${APP_NAME} Release ${VERSION}${NC}"
 echo ""
 
 # Clean previous builds
 echo -e "${BLUE}🧹 Cleaning previous builds...${NC}"
 cd "$PROJECT_DIR"
-rm -rf VibeProxy.app
-rm -f VibeProxy.zip
-rm -f VibeProxy.dmg
+rm -rf "${APP_NAME}.app"
+rm -f "${APP_NAME}.zip"
+rm -f "${APP_NAME}.dmg"
 
 # Build the app
-echo -e "${BLUE}🔨 Building VibeProxy...${NC}"
+echo -e "${BLUE}🔨 Building ${APP_NAME}...${NC}"
 ./create-app-bundle.sh
 
-if [ ! -d "VibeProxy.app" ]; then
-    echo -e "${RED}❌ Build failed - VibeProxy.app not found${NC}"
+if [ ! -d "${APP_NAME}.app" ]; then
+    echo -e "${RED}❌ Build failed - ${APP_NAME}.app not found${NC}"
     exit 1
 fi
 
 # Create ZIP
 echo -e "${BLUE}📦 Creating ZIP archive...${NC}"
-ditto -c -k --sequesterRsrc --keepParent "VibeProxy.app" "VibeProxy-${VERSION}.zip"
+ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" "${APP_NAME}-${VERSION}.zip"
 
 # Calculate checksum
 echo -e "${BLUE}🔐 Calculating checksum...${NC}"
-CHECKSUM=$(shasum -a 256 "VibeProxy-${VERSION}.zip" | awk '{print $1}')
+CHECKSUM=$(shasum -a 256 "${APP_NAME}-${VERSION}.zip" | awk '{print $1}')
 
 # Summary
 echo ""
 echo -e "${GREEN}✅ Release created successfully!${NC}"
 echo ""
 echo -e "${BLUE}Files created:${NC}"
-echo "  - VibeProxy.app (local testing)"
-echo "  - VibeProxy-${VERSION}.zip (for distribution)"
+echo "  - ${APP_NAME}.app (local testing)"
+echo "  - ${APP_NAME}-${VERSION}.zip (for distribution)"
 echo ""
 echo -e "${BLUE}SHA-256 Checksum:${NC}"
 echo "  ${CHECKSUM}"
@@ -56,9 +57,9 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Test the .app locally"
 echo "  2. Create a new release on GitHub"
-echo "  3. Upload VibeProxy-${VERSION}.zip"
+echo "  3. Upload ${APP_NAME}-${VERSION}.zip"
 echo "  4. Add the checksum to release notes"
 echo ""
 echo -e "${BLUE}GitHub Release Command:${NC}"
-echo "  gh release create v${VERSION} VibeProxy-${VERSION}.zip --generate-notes"
+echo "  gh release create v${VERSION} ${APP_NAME}-${VERSION}.zip --generate-notes"
 echo ""

@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -16,26 +17,28 @@ concurrency:
 jobs:
   auto-release:
     runs-on: ubuntu-latest
+    env:
+      WORKFLOW_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN || github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.AUTO_UPDATE_TOKEN }}
+          token: ${{ env.WORKFLOW_TOKEN }}
           fetch-depth: 0
 
-      - name: Check for open CLIProxyAPI bump PRs
+      - name: Check for open CLIProxyAPIPlus bump PRs
         id: check-pr
         env:
-          GH_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+          GH_TOKEN: ${{ env.WORKFLOW_TOKEN }}
         run: |
           set -e
-          echo "Checking for open CLIProxyAPI bump PRs..."
+          echo "Checking for open CLIProxyAPIPlus bump PRs..."
           
           # Find open PRs with bump-cliproxyapi- branch prefix
           PR_JSON=$(gh pr list --state open --json number,headRefName,title --jq '.[] | select(.headRefName | startswith("bump-cliproxyapi-"))' | head -1)
           
           if [ -z "$PR_JSON" ]; then
-            echo "No open CLIProxyAPI bump PRs found."
+            echo "No open CLIProxyAPIPlus bump PRs found."
             echo "has_pr=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -48,7 +51,7 @@ jobs:
           CLIPROXY_VERSION=$(echo "$PR_BRANCH" | sed 's/bump-cliproxyapi-//')
           
           echo "Found PR #$PR_NUMBER: $PR_TITLE"
-          echo "CLIProxyAPI version: $CLIPROXY_VERSION"
+          echo "CLIProxyAPIPlus version: $CLIPROXY_VERSION"
           
           echo "has_pr=true" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
@@ -58,7 +61,7 @@ jobs:
       - name: Merge PR
         if: steps.check-pr.outputs.has_pr == 'true'
         env:
-          GH_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+          GH_TOKEN: ${{ env.WORKFLOW_TOKEN }}
         run: |
           set -e
           PR_NUMBER="${{ steps.check-pr.outputs.pr_number }}"
@@ -114,15 +117,25 @@ jobs:
           printf '%s\n' "## [${NEW_VERSION}] - ${TODAY}" >> CHANGELOG.tmp
           echo "" >> CHANGELOG.tmp
           printf '%s\n' "### Updated" >> CHANGELOG.tmp
-          printf '%s\n' "- **CLIProxyAPI ${CLIPROXY_VERSION}** - Latest upstream release (#${PR_NUMBER})" >> CHANGELOG.tmp
+          printf '%s\n' "- **CLIProxyAPIPlus ${CLIPROXY_VERSION}** - Latest upstream release (#${PR_NUMBER})" >> CHANGELOG.tmp
           printf '%s\n' "  - Various upstream improvements and stability enhancements" >> CHANGELOG.tmp
           echo "" >> CHANGELOG.tmp
           tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
           mv CHANGELOG.tmp CHANGELOG.md
           
-          # Add version link at the bottom (before first existing link)
-          LINK_LINE="[${NEW_VERSION}]: https://github.com/automazeio/vibeproxy/releases/tag/v${NEW_VERSION}"
-          sed -i "0,/^\[.*\]: https:\/\/github.com\/automazeio\/vibeproxy\/releases\/tag\/v/s||${LINK_LINE}\n&|" CHANGELOG.md
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          changelog = Path("CHANGELOG.md")
+          new_version = os.environ["NEW_VERSION"]
+          link_line = f"[{new_version}]: https://github.com/anand-92/droidproxy/releases/tag/v{new_version}"
+
+          lines = changelog.read_text().splitlines()
+          insert_at = next((index for index, line in enumerate(lines) if line.startswith("[") and "releases/tag/v" in line), len(lines))
+          lines.insert(insert_at, link_line)
+          changelog.write_text("\n".join(lines) + "\n")
+          PY
           
           echo "CHANGELOG.md updated"
           head -n 20 CHANGELOG.md
@@ -146,7 +159,16 @@ jobs:
           git push origin "v$NEW_VERSION"
           
           echo "✅ Created and pushed tag v$NEW_VERSION"
-          echo "🚀 This will trigger the release workflow"
+
+      - name: Trigger release workflow
+        if: steps.check-pr.outputs.has_pr == 'true'
+        env:
+          GH_TOKEN: ${{ env.WORKFLOW_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          set -e
+          gh workflow run release.yml --ref main -f version="$NEW_VERSION"
+          echo "✅ Release workflow dispatched for v$NEW_VERSION"
 
       - name: Summary
         if: steps.check-pr.outputs.has_pr == 'true'
@@ -157,8 +179,8 @@ jobs:
         run: |
           echo "## Auto Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **PR #$PR_NUMBER merged** - CLIProxyAPI $CLIPROXY_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **PR #$PR_NUMBER merged** - CLIProxyAPIPlus $CLIPROXY_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Version bumped** - v$NEW_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🚀 **Release workflow triggered** - Check [Actions](../../actions) for build status" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 **Release workflow dispatched** - Check [Actions](../../actions) for build status" >> $GITHUB_STEP_SUMMARY

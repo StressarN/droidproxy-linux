@@ -2,18 +2,21 @@ import Foundation
 import Network
 
 /**
- A lightweight HTTP proxy that intercepts requests to add extended thinking parameters
- for Claude models based on model name suffixes.
- 
- Model name pattern:
- - `*-thinking-NUMBER` → Custom token budget (e.g., claude-sonnet-4-5-20250929-thinking-5000)
- 
- The proxy strips the suffix and adds the `thinking` parameter to the request body
- before forwarding to CLIProxyAPI.
- 
- Examples:
- - claude-sonnet-4-5-20250929-thinking-2000 → 2,000 token budget
- - claude-sonnet-4-5-20250929-thinking-8000 → 8,000 token budget
+ A lightweight HTTP proxy that injects reasoning settings for supported Claude 4.6 and Codex GPT models.
+
+ Current behavior:
+ - Requests whose `model` contains `opus-4-6` receive `thinking: {"type":"adaptive"}`
+   plus `output_config.effort` from `AppPreferences.opus46ThinkingEffort`
+ - Requests whose `model` contains `sonnet-4-6` receive `thinking: {"type":"adaptive"}`
+   plus `output_config.effort` from `AppPreferences.sonnet46ThinkingEffort`
+ - Requests whose `model` is exactly `gpt-5.3-codex` receive `reasoning: {"effort":"..."}`
+   from `AppPreferences.gpt53CodexReasoningEffort`
+ - Requests whose `model` is exactly `gpt-5.4` receive `reasoning: {"effort":"..."}`
+   from `AppPreferences.gpt54ReasoningEffort`
+ - Other models are forwarded unchanged
+
+ The proxy edits the raw JSON string instead of re-serializing it so cache-sensitive key
+ ordering is preserved.
  */
 class ThinkingProxy {
     private var listener: NWListener?
@@ -43,36 +46,7 @@ class ThinkingProxy {
     }
 
     private enum Config {
-        static let defaultHardTokenCap = 32_000     // Opus 4.5, Sonnet 4.5, and older
-        static let extendedHardTokenCap = 128_000   // Opus 4.6+, Sonnet 4.6+ (128K output)
-        static let minimumHeadroom = 1024
-        static let headroomRatio = 0.1
         static let anthropicVersion = "2023-06-01"
-
-        /// Models that support extended output (128K) and adaptive thinking
-        private static let adaptiveModels = ["opus-4-6", "opus-4-7", "sonnet-4-6", "sonnet-4-7"]
-
-        /// Whether the model supports adaptive thinking (Opus 4.6+, Sonnet 4.6+)
-        static func isAdaptiveModel(_ model: String) -> Bool {
-            adaptiveModels.contains(where: { model.contains($0) })
-        }
-
-        static func defaultAdaptiveEffort(for model: String) -> String {
-            if model.contains("opus-4-6") {
-                return AppPreferences.forceMaxOpus46Effort ? "max" : "auto"
-            }
-            return "high"
-        }
-
-        static func shouldIncludeInterleavedThinkingBeta(for model: String?) -> Bool {
-            guard let model else { return true }
-            return !model.contains("opus-4-6")
-        }
-
-        /// Returns the max output token cap for a given (cleaned) model name.
-        static func hardTokenCap(for model: String) -> Int {
-            isAdaptiveModel(model) ? extendedHardTokenCap : defaultHardTokenCap
-        }
     }
     
     /**
@@ -296,131 +270,80 @@ class ThinkingProxy {
         
         // Try to parse and modify JSON body for POST requests
         var modifiedBody = bodyString
-        var thinkingEnabled = false
-        
+
         if method == "POST" && !bodyString.isEmpty {
             ThinkingProxy.fileLog("INCOMING REQUEST: \(method) \(rewrittenPath)")
             ThinkingProxy.fileLog("ORIGINAL BODY (first 500): \(String(bodyString.prefix(500)))")
-            if let result = processThinkingParameter(jsonString: bodyString) {
-                modifiedBody = result.0
-                thinkingEnabled = result.1
+            if let transformed = processThinkingParameter(jsonString: bodyString) {
+                modifiedBody = transformed
                 ThinkingProxy.fileLog("MODIFIED BODY (first 500): \(String(modifiedBody.prefix(500)))")
-                ThinkingProxy.fileLog("THINKING ENABLED: \(thinkingEnabled)")
+                ThinkingProxy.fileLog("THINKING INJECTED: true")
             }
         }
-        
-        forwardRequest(method: method, path: rewrittenPath, version: httpVersion, headers: headers, body: modifiedBody, thinkingEnabled: thinkingEnabled, originalConnection: connection)
+
+        forwardRequest(method: method, path: rewrittenPath, version: httpVersion, headers: headers, body: modifiedBody, originalConnection: connection)
     }
 
     /**
-     Processes the JSON body to add thinking parameter if model name has a thinking suffix.
+     Processes the JSON body to add thinking or reasoning parameters for supported models.
      Uses surgical string operations to preserve original JSON structure and key ordering,
      which is critical for Anthropic's prompt caching (cache_control fields must be preserved).
      Returns tuple of (modifiedJSON, needsTransformation)
      */
-    private func processThinkingParameter(jsonString: String) -> (String, Bool)? {
-        // Parse JSON only to read values — we'll do surgical string replacements to preserve key order
-        // (JSONSerialization.data reorders keys, which breaks Anthropic's prompt cache matching)
+    private func processThinkingParameter(jsonString: String) -> String? {
         guard let jsonData = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
               let model = json["model"] as? String else {
             return nil
         }
 
-        // Only process Claude models (including gemini-claude variants)
+        if let effort = codexReasoningEffort(for: model) {
+            var result = jsonString
+            result = injectJSONField(in: result, afterKey: "model", fieldName: "reasoning",
+                                     fieldValue: "{\"effort\":\"\(effort)\"}")
+            NSLog("[ThinkingProxy] Injected Codex reasoning for '\(model)' with effort '\(effort)'")
+            ThinkingProxy.fileLog("INJECTED Codex reasoning: effort=\(effort) for model \(model)")
+            return result
+        }
+
+        guard let effort = claudeAdaptiveThinkingEffort(for: model) else {
+            return nil
+        }
+
+        var result = jsonString
+        result = injectJSONField(in: result, afterKey: "model", fieldName: "thinking",
+                                 fieldValue: "{\"type\":\"adaptive\"}")
+        result = injectJSONField(in: result, afterKey: "thinking", fieldName: "output_config",
+                                 fieldValue: "{\"effort\":\"\(effort)\"}")
+        NSLog("[ThinkingProxy] Injected adaptive thinking for '\(model)' with effort '\(effort)'")
+        ThinkingProxy.fileLog("INJECTED adaptive thinking: effort=\(effort) for model \(model)")
+
+        return result
+    }
+
+    private func codexReasoningEffort(for model: String) -> String? {
+        switch model {
+        case "gpt-5.3-codex":
+            return AppPreferences.gpt53CodexReasoningEffort
+        case "gpt-5.4":
+            return AppPreferences.gpt54ReasoningEffort
+        default:
+            return nil
+        }
+    }
+
+    private func claudeAdaptiveThinkingEffort(for model: String) -> String? {
         guard model.starts(with: "claude-") || model.starts(with: "gemini-claude-") else {
-            return (jsonString, false)  // Not Claude, pass through
+            return nil
         }
 
-        // Check for thinking suffix pattern: -thinking-NUMBER or -thinking-NUMBER-EFFORT
-        // where EFFORT is one of: low, medium, high, max
-        let thinkingPrefix = "-thinking-"
-        if let thinkingRange = model.range(of: thinkingPrefix, options: .backwards),
-           thinkingRange.upperBound < model.endIndex {
-
-            // Extract everything after "-thinking-" (e.g. "128000" or "128000-max")
-            let suffixString = String(model[thinkingRange.upperBound...])
-
-            // Parse optional effort level from suffix (e.g. "128000-max" → budget="128000", effort="max")
-            let validEfforts = ["low", "medium", "high", "max"]
-            let budgetString: String
-            var effortLevel: String? = nil
-            if let lastDash = suffixString.lastIndex(of: "-") {
-                let candidate = String(suffixString[suffixString.index(after: lastDash)...])
-                if validEfforts.contains(candidate) {
-                    budgetString = String(suffixString[..<lastDash])
-                    effortLevel = candidate
-                } else {
-                    budgetString = suffixString
-                }
-            } else {
-                budgetString = suffixString
-            }
-
-            // Determine clean model name
-            let cleanModel: String
-            if model.starts(with: "gemini-claude-") {
-                cleanModel = String(model[..<thinkingRange.upperBound].dropLast(1))
-            } else {
-                cleanModel = String(model[..<thinkingRange.lowerBound])
-            }
-
-            // Surgical string replacement: swap model name preserving JSON structure
-            var result = jsonString.replacingOccurrences(of: "\"\(model)\"", with: "\"\(cleanModel)\"")
-
-            if let budget = Int(budgetString), budget > 0 {
-                let modelCap = Config.hardTokenCap(for: cleanModel)
-                let effectiveBudget = min(budget, modelCap - 1)
-                if effectiveBudget != budget {
-                    NSLog("[ThinkingProxy] Adjusted thinking budget from \(budget) to \(effectiveBudget) (cap: \(modelCap))")
-                }
-
-                // Build thinking parameter JSON
-                let isAdaptiveModel = Config.isAdaptiveModel(cleanModel)
-                let thinkingJson: String
-                if isAdaptiveModel {
-                    thinkingJson = "{\"type\":\"adaptive\"}"
-                    NSLog("[ThinkingProxy] Using adaptive thinking for model '\(cleanModel)' (budget \(effectiveBudget) used as max_tokens floor)")
-                } else {
-                    thinkingJson = "{\"type\":\"enabled\",\"budget_tokens\":\(effectiveBudget)}"
-                }
-
-                // Inject thinking field after model field
-                result = injectJSONField(in: result, afterKey: "model", fieldName: "thinking", fieldValue: thinkingJson)
-
-                // For adaptive models, inject output_config.effort
-                if isAdaptiveModel {
-                    let effort = effortLevel ?? Config.defaultAdaptiveEffort(for: cleanModel)
-                    result = injectJSONField(in: result, afterKey: "thinking", fieldName: "output_config",
-                                             fieldValue: "{\"effort\":\"\(effort)\"}")
-                    ThinkingProxy.fileLog("INJECTED effort: \(effort) for model \(cleanModel)")
-                }
-
-                // Ensure max token limits exceed the thinking budget
-                let tokenHeadroom = max(Config.minimumHeadroom, Int(Double(effectiveBudget) * Config.headroomRatio))
-                let desiredMaxTokens = effectiveBudget + tokenHeadroom
-                var requiredMaxTokens = min(desiredMaxTokens, modelCap)
-                if requiredMaxTokens <= effectiveBudget {
-                    requiredMaxTokens = min(effectiveBudget + 1, modelCap)
-                }
-
-                result = replaceJSONIntField(in: result, key: "max_tokens",
-                                             oldValue: json["max_tokens"] as? Int, minimum: requiredMaxTokens, budget: effectiveBudget)
-                result = replaceJSONIntField(in: result, key: "max_output_tokens",
-                                             oldValue: json["max_output_tokens"] as? Int, minimum: requiredMaxTokens, budget: effectiveBudget)
-
-                NSLog("[ThinkingProxy] Transformed '\(model)' → '\(cleanModel)' with budget \(effectiveBudget)\(effortLevel.map { ", effort: \($0)" } ?? "")")
-            } else {
-                NSLog("[ThinkingProxy] Stripped invalid thinking suffix from '\(model)' → '\(cleanModel)' (no thinking)")
-            }
-
-            return (result, true)
-        } else if model.hasSuffix("-thinking") || model.contains("-thinking(") {
-            NSLog("[ThinkingProxy] Detected thinking model '\(model)' - enabling beta header, passing through to backend")
-            return (jsonString, true)
+        if model.contains("opus-4-6") {
+            return AppPreferences.opus46ThinkingEffort
         }
-
-        return (jsonString, false)  // No transformation needed
+        if model.contains("sonnet-4-6") {
+            return AppPreferences.sonnet46ThinkingEffort
+        }
+        return nil
     }
 
     // MARK: - Surgical JSON string helpers
@@ -444,18 +367,6 @@ class ThinkingProxy {
         result.insert(contentsOf: ",\"\(fieldName)\":\(fieldValue)", at: insertIndex)
         return result
     }
-
-    /// Replaces a numeric JSON field value in-place if it's below the required minimum.
-    private func replaceJSONIntField(in json: String, key: String, oldValue: Int?, minimum: Int, budget: Int) -> String {
-        guard let current = oldValue, current <= budget else { return json }
-        let escapedKey = NSRegularExpression.escapedPattern(for: key)
-        let pattern = "\"\(escapedKey)\"(\\s*:\\s*)\(current)\\b"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return json }
-        let range = NSRange(json.startIndex..., in: json)
-        return regex.stringByReplacingMatches(in: json, range: range,
-                                              withTemplate: "\"\(key)\"$1\(minimum)")
-    }
-    
     /**
      Forwards Amp API requests to ampcode.com, stripping the /api/ prefix
      */
@@ -612,39 +523,11 @@ class ThinkingProxy {
             }
         }
     }
-    
-    private enum BetaHeaders {
-        static let interleavedThinking = "interleaved-thinking-2025-05-14"
-    }
 
-    private func extractModelName(from jsonString: String) -> String? {
-        guard let jsonData = jsonString.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            return nil
-        }
-        return json["model"] as? String
-    }
-
-    private func mergedBetaHeader(existingHeader: String?, shouldAddInterleavedThinking: Bool) -> String? {
-        var values = existingHeader?
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty } ?? []
-
-        values.removeAll { $0 == BetaHeaders.interleavedThinking }
-
-        if shouldAddInterleavedThinking {
-            values.append(BetaHeaders.interleavedThinking)
-        }
-
-        guard !values.isEmpty else { return nil }
-        return values.joined(separator: ",")
-    }
-    
     /**
      Forwards the request to CLIProxyAPI on port 8318 (pass-through for non-thinking requests)
      */
-    private func forwardRequest(method: String, path: String, version: String, headers: [(String, String)], body: String, thinkingEnabled: Bool = false, originalConnection: NWConnection, retryWithApiPrefix: Bool = false) {
+    private func forwardRequest(method: String, path: String, version: String, headers: [(String, String)], body: String, originalConnection: NWConnection, retryWithApiPrefix: Bool = false) {
         // Create connection to CLIProxyAPI
         guard let port = NWEndpoint.Port(rawValue: targetPort) else {
             NSLog("[ThinkingProxy] Invalid target port: %d", targetPort)
@@ -661,37 +544,15 @@ class ThinkingProxy {
                 // Build the forwarded request
                 var forwardedRequest = "\(method) \(path) \(version)\r\n"
                 let excludedHeaders: Set<String> = ["content-length", "host", "transfer-encoding"]
-                var existingBetaHeader: String? = nil
-                let modelName = self.extractModelName(from: body)
-                let shouldIncludeInterleavedThinking = Config.shouldIncludeInterleavedThinkingBeta(for: modelName)
-                
+
                 for (name, value) in headers {
                     let lowercasedName = name.lowercased()
                     if excludedHeaders.contains(lowercasedName) {
                         continue
                     }
-                    // Capture existing anthropic-beta header for merging
-                    if lowercasedName == "anthropic-beta" {
-                        existingBetaHeader = value
-                        continue
-                    }
                     forwardedRequest += "\(name): \(value)\r\n"
                 }
 
-                let betaValue = self.mergedBetaHeader(
-                    existingHeader: existingBetaHeader,
-                    shouldAddInterleavedThinking: thinkingEnabled && shouldIncludeInterleavedThinking
-                )
-
-                if let betaValue {
-                    forwardedRequest += "anthropic-beta: \(betaValue)\r\n"
-                    if thinkingEnabled && shouldIncludeInterleavedThinking {
-                        NSLog("[ThinkingProxy] Added interleaved thinking beta header")
-                    }
-                } else if existingBetaHeader != nil && !shouldIncludeInterleavedThinking {
-                    NSLog("[ThinkingProxy] Removed interleaved thinking beta header for Opus 4.6 request")
-                }
-                
                 // Override Host header
                 forwardedRequest += "Host: \(self.targetHost):\(self.targetPort)\r\n"
                 // Always close connections - this proxy doesn't support keep-alive/pipelining

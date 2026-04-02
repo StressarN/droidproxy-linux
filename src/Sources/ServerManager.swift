@@ -74,7 +74,8 @@ class ServerManager: ObservableObject {
 
     /// OAuth provider keys used in config.yaml oauth-excluded-models
     static let oauthProviderKeys: [String: String] = [
-        "claude": "claude"
+        "claude": "claude",
+        "codex": "codex"
     ]
 
     init() {
@@ -262,6 +263,8 @@ class ServerManager: ObservableObject {
         switch command {
         case .claudeLogin:
             authProcess.arguments = ["--config", configPath, "-claude-login"]
+        case .codexLogin:
+            authProcess.arguments = ["--config", configPath, "-codex-login"]
         }
         
         // Create pipes for output
@@ -273,6 +276,18 @@ class ServerManager: ObservableObject {
         authProcess.standardInput = inputPipe
         
         let capture = OutputCapture()
+        
+        // For Codex login, avoid blocking on the manual callback prompt after ~15s.
+        if case .codexLogin = command {
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 12.0) {
+                if authProcess.isRunning {
+                    if let data = "\n".data(using: .utf8) {
+                        try? inputPipe.fileHandleForWriting.write(contentsOf: data)
+                        NSLog("[Auth] Sent newline to keep Codex login waiting for callback")
+                    }
+                }
+            }
+        }
         
         // Set environment to inherit from parent
         authProcess.environment = ProcessInfo.processInfo.environment
@@ -446,4 +461,5 @@ oauth-excluded-models:
 
 enum AuthCommand: Equatable {
     case claudeLogin
+    case codexLogin
 }

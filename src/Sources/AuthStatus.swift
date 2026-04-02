@@ -2,10 +2,12 @@ import Foundation
 
 enum ServiceType: String, CaseIterable {
     case claude
+    case codex
     
     var displayName: String {
         switch self {
         case .claude: return "Claude Code"
+        case .codex: return "Codex"
         }
     }
 }

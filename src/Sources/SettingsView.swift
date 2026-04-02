@@ -78,6 +78,7 @@ struct ServiceRow<ExtraContent: View>: View {
     let onDisconnect: (AuthAccount) -> Void
     let onToggleDisabled: (AuthAccount) -> Void
     let onToggleEnabled: (Bool) -> Void
+    let toggleTint: Color
     var onExpandChange: ((Bool) -> Void)? = nil
     @ViewBuilder var extraContent: () -> ExtraContent
 
@@ -104,6 +105,7 @@ struct ServiceRow<ExtraContent: View>: View {
                 ))
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .tint(toggleTint)
                 .labelsHidden()
                 .help(isEnabled ? "Disable this provider" : "Enable this provider")
 
@@ -217,7 +219,10 @@ struct SettingsView: View {
     @ObservedObject var serverManager: ServerManager
     @StateObject private var authManager = AuthManager()
     @State private var launchAtLogin = false
-    @AppStorage(AppPreferences.forceMaxOpus46EffortKey) private var forceMaxOpus46Effort = AppPreferences.defaultForceMaxOpus46Effort
+    @AppStorage(AppPreferences.opus46ThinkingEffortKey) private var opus46ThinkingEffort = AppPreferences.defaultOpus46ThinkingEffort
+    @AppStorage(AppPreferences.sonnet46ThinkingEffortKey) private var sonnet46ThinkingEffort = AppPreferences.defaultSonnet46ThinkingEffort
+    @AppStorage(AppPreferences.gpt53CodexReasoningEffortKey) private var gpt53CodexReasoningEffort = AppPreferences.defaultGpt53CodexReasoningEffort
+    @AppStorage(AppPreferences.gpt54ReasoningEffortKey) private var gpt54ReasoningEffort = AppPreferences.defaultGpt54ReasoningEffort
     @State private var authenticatingService: ServiceType? = nil
     @State private var showingAuthResult = false
     @State private var authResultMessage = ""
@@ -225,6 +230,11 @@ struct SettingsView: View {
     @State private var fileMonitor: DispatchSourceFileSystemObject?
     @State private var pendingRefresh: DispatchWorkItem?
     @State private var expandedRowCount = 0
+    private let claudeEffortSelectionColor = Color(red: 0xD9/255, green: 0x77/255, blue: 0x57/255)
+    private let codexEffortSelectionColor = Color(red: 0x74/255, green: 0xAA/255, blue: 0x9C/255)
+    private let oledWindowBackground = Color.black
+    private let oledSectionBackground = Color(red: 0x12/255, green: 0x12/255, blue: 0x12/255)
+    private let oledFooterText = Color(red: 0xA8/255, green: 0xA8/255, blue: 0xA8/255)
     
     private enum Timing {
         static let serverRestartDelay: TimeInterval = 0.3
@@ -258,7 +268,7 @@ struct SettingsView: View {
                         }) {
                             HStack(spacing: 6) {
                                 Circle()
-                                    .fill(serverManager.isRunning ? AccountRowView.accent : Color.red)
+                                    .fill(serverManager.isRunning ? Color.green : Color.red)
                                     .frame(width: 8, height: 8)
                                 Text(serverManager.isRunning ? "Running" : "Stopped")
                             }
@@ -266,6 +276,7 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .listRowBackground(oledSectionBackground)
 
                 Section {
                     Toggle("Launch at login", isOn: $launchAtLogin)
@@ -273,8 +284,33 @@ struct SettingsView: View {
                             toggleLaunchAtLogin(newValue)
                         }
 
-                    Toggle("Force Opus 4.6 max effort", isOn: $forceMaxOpus46Effort)
-                        .help("When off, Opus 4.6 adaptive thinking uses auto effort.")
+                    effortPickerRow(
+                        "Opus 4.6 thinking effort",
+                        selection: $opus46ThinkingEffort,
+                        options: ["low", "medium", "high", "max"],
+                        tint: claudeEffortSelectionColor
+                    )
+
+                    effortPickerRow(
+                        "Sonnet 4.6 thinking effort",
+                        selection: $sonnet46ThinkingEffort,
+                        options: ["low", "medium", "high"],
+                        tint: claudeEffortSelectionColor
+                    )
+
+                    effortPickerRow(
+                        "GPT 5.3 Codex reasoning effort",
+                        selection: $gpt53CodexReasoningEffort,
+                        options: ["low", "medium", "high", "xhigh"],
+                        tint: codexEffortSelectionColor
+                    )
+
+                    effortPickerRow(
+                        "GPT 5.4 reasoning effort",
+                        selection: $gpt54ReasoningEffort,
+                        options: ["low", "medium", "high", "xhigh"],
+                        tint: codexEffortSelectionColor
+                    )
 
                     HStack {
                         Text("Auth files")
@@ -284,6 +320,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .listRowBackground(oledSectionBackground)
 
                 Section("Services") {
                     ServiceRow(
@@ -298,11 +335,31 @@ struct SettingsView: View {
                         onDisconnect: { account in disconnectAccount(account) },
                         onToggleDisabled: { account in toggleAccountDisabled(account) },
                         onToggleEnabled: { enabled in serverManager.setProviderEnabled("claude", enabled: enabled) },
+                        toggleTint: claudeEffortSelectionColor,
+                        onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
+                    ) { EmptyView() }
+
+                    ServiceRow(
+                        serviceType: .codex,
+                        iconName: "icon-codex.png",
+                        accounts: authManager.accounts(for: .codex),
+                        isAuthenticating: authenticatingService == .codex,
+                        helpText: nil,
+                        isEnabled: serverManager.isProviderEnabled("codex"),
+                        customTitle: nil,
+                        onConnect: { connectService(.codex) },
+                        onDisconnect: { account in disconnectAccount(account) },
+                        onToggleDisabled: { account in toggleAccountDisabled(account) },
+                        onToggleEnabled: { enabled in serverManager.setProviderEnabled("codex", enabled: enabled) },
+                        toggleTint: codexEffortSelectionColor,
                         onExpandChange: { expanded in expandedRowCount += expanded ? 1 : -1 }
                     ) { EmptyView() }
                 }
+                .listRowBackground(oledSectionBackground)
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(oledWindowBackground)
             .scrollDisabled(expandedRowCount == 0)
 
             Spacer()
@@ -313,33 +370,34 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Text("DroidProxy \(appVersion) was made possible thanks to")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                     Link("CLIProxyAPIPlus", destination: URL(string: "https://github.com/router-for-me/CLIProxyAPIPlus")!)
                         .font(.caption)
                         .underline()
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                         .onHover { inside in
                             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                         }
                     Text("|")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                     Text("License: MIT")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                 }
 
                 HStack(spacing: 4) {
                     Text("© 2026")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                     Text("DroidProxy")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(oledFooterText)
                 }
 
                 Link("Report an issue", destination: URL(string: "https://github.com/anand-92/droidproxy/issues")!)
                     .font(.caption)
+                    .foregroundColor(oledFooterText)
                     .padding(.top, 6)
                     .onHover { inside in
                         if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
@@ -347,7 +405,9 @@ struct SettingsView: View {
             }
             .padding(.bottom, 12)
         }
+        .background(oledWindowBackground)
         .accentColor(AccountRowView.accent)
+        .preferredColorScheme(.dark)
         .frame(width: 480, height: 740)
         .onAppear {
             authManager.checkAuthStatus()
@@ -365,6 +425,24 @@ struct SettingsView: View {
     }
 
     // MARK: - Actions
+
+    @ViewBuilder
+    private func effortPickerRow(_ title: String, selection: Binding<String>, options: [String], tint: Color = AccountRowView.accent) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Picker("", selection: selection) {
+                ForEach(options, id: \.self) { option in
+                    Text(option).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .tint(tint)
+            .labelsHidden()
+        }
+        .padding(.vertical, 2)
+    }
     
     private func toggleAccountDisabled(_ account: AuthAccount) {
         if authManager.toggleAccountDisabled(account) {
@@ -412,6 +490,7 @@ struct SettingsView: View {
         let command: AuthCommand
         switch serviceType {
         case .claude: command = .claudeLogin
+        case .codex: command = .codexLogin
         }
         
         serverManager.runAuthCommand(command) { success, output in
@@ -436,6 +515,8 @@ struct SettingsView: View {
         switch serviceType {
         case .claude:
             return "🌐 Browser opened for Claude Code authentication.\n\nPlease complete the login in your browser.\n\nThe app will automatically detect your credentials."
+        case .codex:
+            return "🌐 Browser opened for Codex authentication.\n\nPlease complete the login in your browser.\n\nThe app will automatically detect your credentials."
         }
     }
     

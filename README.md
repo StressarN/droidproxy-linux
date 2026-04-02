@@ -4,7 +4,7 @@
   <img src="logo.png" alt="DroidProxy" width="128">
 </p>
 
-A native macOS menu bar app that proxies Claude Code authentication for use with AI coding tools like [<img src="factory-logo.svg" alt="Factory.ai" height="16">](https://app.factory.ai) Droids. Built on [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus).
+A native macOS menu bar app that proxies Claude Code and Codex authentication for use with AI coding tools like [<img src="factory-logo.svg" alt="Factory.ai" height="16">](https://app.factory.ai) Droids. Built on [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus).
 
 ## Download
 
@@ -17,11 +17,11 @@ All releases are code-signed and notarized by Apple. Existing installs auto-upda
 
 ## Features
 
-- **One-click Claude Code auth** -- OAuth login from the menu bar, credential monitoring, auto-refresh
-- **Extended thinking proxy** -- Injects `thinking` parameters into Anthropic API calls so you can use `-thinking-N` model suffixes (e.g. `claude-opus-4-6-thinking-128000`)
-- **Opus 4.6 / Sonnet 4.6 support** -- Adaptive thinking with configurable effort (`auto` or `max`), 128K output cap, interleaved thinking
+- **One-click OAuth auth** -- Claude Code and Codex login from the menu bar, credential monitoring, auto-refresh
+- **Adaptive thinking proxy** -- Injects `thinking: {"type":"adaptive"}` and per-model `output_config.effort` for Claude Opus 4.6 and Claude Sonnet 4.6 requests sent through `http://localhost:8317`
+- **Per-model effort controls** -- Configure Opus 4.6 (`low` / `medium` / `high` / `max`) and Sonnet 4.6 (`low` / `medium` / `high`) directly from the Settings window
 - **Sparkle auto-updates** -- Checks daily, installs in the background
-- **Factory integration** -- Drop-in custom model config for Factory Droids
+- **Factory integration** -- Use the standard Anthropic model aliases (for example `claude-opus-4-6` and `claude-sonnet-4-6`) against the local proxy
 
 ## Setup
 
@@ -66,7 +66,8 @@ src/
 │       ├── AppIcon.icns        # App icon
 │       ├── icon-active.png     # Menu bar icon (active)
 │       ├── icon-inactive.png   # Menu bar icon (inactive)
-│       └── icon-claude.png     # Claude service icon
+│       ├── icon-claude.png     # Claude service icon
+│       └── icon-codex.png      # Codex service icon
 ├── Package.swift
 └── Info.plist
 ```
