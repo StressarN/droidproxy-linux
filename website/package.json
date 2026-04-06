@@ -9,8 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "@lobehub/fluent-emoji": "^4.1.0",
+    "@lobehub/icons": "^5.2.0",
+    "@lobehub/ui": "^5.6.4",
+    "antd": "^6.3.5",
+    "es-toolkit": "^1.45.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
