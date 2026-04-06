@@ -257,10 +257,10 @@ class ServerManager: ObservableObject {
         
         let authProcess = Process()
         authProcess.executableURL = URL(fileURLWithPath: bundledPath)
-        
+
         // Get the config path
         let configPath = (resourcePath as NSString).appendingPathComponent("config.yaml")
-        
+
         switch command {
         case .claudeLogin:
             authProcess.arguments = ["--config", configPath, "-claude-login"]
@@ -269,7 +269,7 @@ class ServerManager: ObservableObject {
         case .geminiLogin:
             authProcess.arguments = ["--config", configPath, "-login"]
         }
-        
+
         // Create pipes for output
         let outputPipe = Pipe()
         let errorPipe = Pipe()
@@ -291,19 +291,20 @@ class ServerManager: ObservableObject {
                 }
             }
         }
-        
-        // For Gemini login, automatically send newline to accept default project
+
+        // For Gemini login, send "2" after OAuth completes to select Google One (personal account)
+        // OAuth typically completes within 15-20 seconds
         if case .geminiLogin = command {
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3.0) {
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 20.0) {
                 if authProcess.isRunning {
-                    if let data = "\n".data(using: .utf8) {
+                    if let data = "2\n".data(using: .utf8) {
                         try? inputPipe.fileHandleForWriting.write(contentsOf: data)
-                        NSLog("[Auth] Sent newline to accept default Gemini project")
+                        NSLog("[Auth] Sent '2' to select Google One")
                     }
                 }
             }
         }
-        
+
         // Set environment to inherit from parent
         authProcess.environment = ProcessInfo.processInfo.environment
         
