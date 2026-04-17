@@ -113,15 +113,8 @@ In any Droid session, use the slash commands:
 
 Both droids are read-only (no file edits) and return a structured verdict with challenges, edge cases, and acknowledgements of what's solid.
 
-## Star History
-
-<a href="https://starchart.cc/anand-92/droidproxy">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://starchart.cc/anand-92/droidproxy.svg?theme=dark">
-    <img alt="Star History Chart" src="https://starchart.cc/anand-92/droidproxy.svg">
-  </picture>
-</a>
-
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/anand-92/droidproxy.svg?variant=dark)](https://starchart.cc/anand-92/droidproxy)
 ## License
 
 MIT
