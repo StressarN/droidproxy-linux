@@ -1,8 +1,8 @@
 # Maintainer: StressarN <martin.gustavsen@kreatell.com>
 pkgname=droidproxy-linux-bin
 _realname=droidproxy
-pkgver=1.8.10
-pkgrel=2
+pkgver=1.8.11
+pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (AppImage)"
 # Only x86_64 AppImages are built by .github/workflows/linux-release.yml today.
 # aarch64 users should install the source package `droidproxy-linux` instead
