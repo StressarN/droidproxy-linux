@@ -28,7 +28,7 @@ GITHUB_REPO = "router-for-me/CLIProxyAPIPlus"
 RELEASE_URL_TEMPLATE = (
     "https://github.com/router-for-me/CLIProxyAPIPlus/releases/download/v{version}/{asset}"
 )
-USER_AGENT = "droidproxy-linux/1.0 (+https://github.com/anand-92/droidproxy)"
+USER_AGENT = "droidproxy-linux/1.0 (+https://github.com/StressarN/droidproxy-linux)"
 
 _ARCH_MAP = {
     "x86_64": "amd64",

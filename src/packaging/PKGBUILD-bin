@@ -1,18 +1,18 @@
-# Maintainer: DroidProxy Linux <droidproxy@localhost>
-pkgname=droidproxy-bin
+# Maintainer: StressarN <martin.gustavsen@kreatell.com>
+pkgname=droidproxy-linux-bin
 _realname=droidproxy
-pkgver=1.8.8
+pkgver=1.8.9
 pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (AppImage)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/anand-92/droidproxy"
+url="https://github.com/StressarN/droidproxy-linux"
 license=('MIT')
 depends=('fuse2')
 optdepends=(
     'cloudflared: expose the proxy to the public internet'
 )
 provides=('droidproxy')
-conflicts=('droidproxy')
+conflicts=('droidproxy' 'droidproxy-linux')
 source_x86_64=("DroidProxyLinux-x86_64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-x86_64.AppImage")
 source_aarch64=("DroidProxyLinux-aarch64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-aarch64.AppImage")
 source=(

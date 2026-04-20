@@ -216,7 +216,7 @@ class TrayApp:
     def _on_check_updates(self, _widget) -> None:
         updater = self._ctx.updater
         if updater is None:
-            self._open("https://github.com/anand-92/droidproxy/releases/latest")
+            self._open("https://github.com/StressarN/droidproxy-linux/releases/latest")
             return
         self._schedule(updater.check_for_updates(interactive=True))
 

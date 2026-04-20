@@ -63,7 +63,7 @@ sudo dnf install python3-gobject gtk3 libayatana-appindicator3 xdg-utils
 ### AppImage (recommended)
 
 Download the AppImage for your architecture from the
-[releases page](https://github.com/anand-92/droidproxy/releases/latest):
+[releases page](https://github.com/StressarN/droidproxy-linux/releases/latest):
 
 ```bash
 chmod +x DroidProxyLinux-x86_64.AppImage
@@ -89,21 +89,21 @@ pipx install 'droidproxy[tray]'
 
 ### Arch (AUR)
 
-Two packages will be published:
+Two packages are published from this fork:
 
-- `droidproxy-bin` -- uses the AppImage (recommended for most users)
-- `droidproxy` -- source build against system Python / GTK
+- `droidproxy-linux-bin` -- uses the AppImage (recommended for most users)
+- `droidproxy-linux` -- source build against system Python / GTK
 
 ```bash
-paru -S droidproxy-bin     # or: droidproxy
+paru -S droidproxy-linux-bin     # or: droidproxy-linux
 ```
 
 ### Source checkout
 
 ```bash
-git clone https://github.com/anand-92/droidproxy.git
-cd droidproxy/src
-python -m venv .venv
+git clone https://github.com/StressarN/droidproxy-linux.git
+cd droidproxy-linux/src
+python -m venv --system-site-packages .venv
 source .venv/bin/activate
 pip install -e '.[tray,dev]'
 ```

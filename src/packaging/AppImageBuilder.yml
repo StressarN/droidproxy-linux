@@ -44,6 +44,6 @@ AppDir:
       - usr/lib/python3/dist-packages/**/__pycache__/**
 
 AppImage:
-  update-information: "gh-releases-zsync|anand-92|droidproxy|latest|DroidProxyLinux-x86_64.AppImage.zsync"
+  update-information: "gh-releases-zsync|StressarN|droidproxy-linux|latest|DroidProxyLinux-x86_64.AppImage.zsync"
   arch: x86_64
   file_name: DroidProxyLinux-x86_64.AppImage

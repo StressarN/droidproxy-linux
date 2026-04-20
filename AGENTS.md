@@ -2,148 +2,306 @@
 
 ## Build & Run
 
-The Swift package lives in `src/`. Run all `swift build`, `swift run`, and `swift package` commands from there, not from the repo root.
+The package lives in `src/` using a standard Python src-layout
+(`src/pyproject.toml`, package source at `src/src/droidproxy/`, tests at
+`src/tests/`). Run everything from the repo root.
 
 ```bash
-# Debug build
-cd src && swift build
+# One-time venv (use --system-site-packages so the distro PyGObject is available)
+python -m venv --system-site-packages src/.venv
+src/.venv/bin/pip install -e 'src[dev,tray]'
 
-# Run the app (menu bar app — swift run does not work for LSUIElement apps)
-# Build the .app bundle first, then open it:
-./create-app-bundle.sh && open DroidProxy.app
+# Run it
+src/.venv/bin/droidproxy             # tray + web UI + daemon (default)
+src/.venv/bin/droidproxy daemon      # headless (SSH / no tray)
+src/.venv/bin/droidproxy doctor      # diagnose ports, binary, GTK, cloudflared
+src/.venv/bin/droidproxy install-binary   # (re)download cli-proxy-api-plus
+src/.venv/bin/droidproxy install-models   # apply DroidProxy models to ~/.factory/settings.json
+src/.venv/bin/droidproxy install-droids   # copy Challenger Droid .md files into ~/.factory/
 
-# Release .app bundle at repo root
-# Picks up CODESIGN_IDENTITY / APP_VERSION / TARGET_ARCH from env when present
-./create-app-bundle.sh
+# Tests + lint (run after every change)
+src/.venv/bin/python -m pytest src/tests   # ~95 tests, ~3 s
+src/.venv/bin/ruff check src/src src/tests
 ```
 
-`create-app-bundle.sh` currently builds `DroidProxy.app` at the repo root and bundles resources from `src/Sources/Resources/`.
-
-### Notarization (local)
-
-```bash
-ditto -c -k --sequesterRsrc --keepParent "DroidProxy.app" "DroidProxy-notarize.zip"
-xcrun notarytool submit "DroidProxy-notarize.zip" --keychain-profile "notarytool" --wait
-xcrun stapler staple "DroidProxy.app"
-```
-
-### Sparkle update signing
-
-```bash
-src/.build/artifacts/sparkle/Sparkle/bin/sign_update DroidProxy-arm64.zip
-```
+Release artifacts are produced by GitHub Actions
+(`.github/workflows/linux-release.yml`) on `v*` tags: matrix-built
+AppImages (x86_64 + aarch64 + `.zsync`) plus a PyPI-ready wheel/sdist.
+There is no local packaging step analogous to the old
+`create-app-bundle.sh`.
 
 ## Source Of Truth
 
-The compiled app code is under `src/`. Treat `src/Sources/**`, `src/Info.plist`, and `create-app-bundle.sh` as source of truth.
+Treat the following as canonical:
 
-There is also a top-level `resources/` tree containing mirrored Swift files and assets. It is not the SwiftPM target used by `src/Package.swift`, so do not assume edits there affect the app unless the task is explicitly about that directory.
+- `src/pyproject.toml` -- dependencies, entry point, package data.
+- `src/src/droidproxy/**/*.py` -- runtime code.
+- `src/src/droidproxy/resources/config.yaml` -- bundled
+  `cli-proxy-api-plus` config (`port: 8318`, localhost binding, Amp
+  upstream settings, auth dir).
+- `src/src/droidproxy/resources/web/{index.html,styles.css,app.js}` --
+  settings UI served at `http://127.0.0.1:8316/`.
+- `src/src/droidproxy/resources/factory/{droids,commands}/*.md` --
+  bundled Challenger Droid configs copied into `~/.factory/` by
+  `install_challenger_droids`.
+- `src/packaging/` -- `droidproxy.desktop`, `droidproxy.service`
+  (systemd --user), `AppImageBuilder.yml`, `PKGBUILD` (source build) and
+  `PKGBUILD-bin` (AppImage-based) for AUR.
+
+There is no other source tree. The old Swift `src/Sources/` and the
+macOS-era assets (`create-app-bundle.sh`, `appcast*.xml`, Sparkle
+entitlements, `website/`, `graphify-out/`) were removed when this port
+became the canonical tree. Do not re-add them.
 
 ## Architecture
 
-DroidProxy is a macOS menu bar app (`LSUIElement`) with:
+DroidProxy Linux is a single Python process that owns:
 
-1. `ThinkingProxy` on `localhost:8317`, the user-facing TCP proxy.
-2. Bundled `CLIProxyAPIPlus` on `127.0.0.1:8318`, managed as a child process by `ServerManager`.
+1. `ThinkingProxy` -- an aiohttp HTTP server on `127.0.0.1:8317`
+   (`src/src/droidproxy/proxy.py`).
+2. `cli-proxy-api-plus` (the upstream Go binary) as a subprocess on
+   `127.0.0.1:8318`, managed by `ServerManager`
+   (`src/src/droidproxy/backend.py`). The binary is downloaded + SHA-256
+   verified on first run by `src/src/droidproxy/binary.py` using a
+   version pinned in `PINNED_VERSION`.
+3. `WebUI` -- aiohttp app on `127.0.0.1:8316`
+   (`src/src/droidproxy/web.py`) serving the settings UI + `/api/*`.
+4. `AuthWatcher` -- `watchdog` observer on `~/.cli-proxy-api/` that fans
+   OAuth file-changes out over SSE
+   (`src/src/droidproxy/auth.py`).
+5. Optional `TrayApp` -- GTK `AyatanaAppIndicator3` tray icon
+   (`src/src/droidproxy/tray.py`). GTK runs on the main thread; the
+   asyncio loop runs on a background daemon thread; menu callbacks
+   marshal back via `loop.call_soon_threadsafe(asyncio.ensure_future, coro)`.
+6. `TunnelManager` (`src/src/droidproxy/tunnel.py`) -- optional
+   `cloudflared tunnel --url` wrapper; never started implicitly.
+7. `Updater` (`src/src/droidproxy/updater.py`) -- daily GitHub release
+   poll that picks an install-method-aware upgrade path (AppImageUpdate
+   / pipx / AUR hint).
+
+The glue lives in:
+
+- `src/src/droidproxy/context.py` -- `AppContext` dataclass owns every
+  long-lived singleton.
+- `src/src/droidproxy/app.py` -- `run_daemon()` and `run_with_tray()`
+  handle asyncio/GTK cohabitation, signal handling, service startup
+  order (proxy → backend → auth watcher → web UI → updater).
+- `src/src/droidproxy/cli.py` -- argparse entry point
+  (`droidproxy = droidproxy.cli:main`).
 
 Typical request flow:
 
-`Client -> :8317 ThinkingProxy -> :8318 CLIProxyAPIPlus -> upstream provider`
+`Client -> :8317 ThinkingProxy -> :8318 cli-proxy-api-plus -> upstream provider`
 
-### Current ThinkingProxy behavior
+## Current ThinkingProxy behavior
 
-`ThinkingProxy.swift` no longer implements the old `-thinking-N` suffix parser described in older docs.
+Byte-stable port of the original Swift `ThinkingProxy`. The injector
+(`src/src/droidproxy/injector.py`) edits raw JSON strings via regex so
+Anthropic's prompt cache keeps hitting. Never replace the regex
+transforms with `json.dumps`, and never reorder keys. The snapshot tests
+in `src/tests/test_injector.py` are the contract.
 
-What it does today:
+What the proxy does on `POST` JSON bodies:
 
-- Inspects `POST` JSON requests for supported Claude, Codex GPT, and Gemini models
-- Injects Claude adaptive thinking for models whose name contains `opus-4-7` or `sonnet-4-6`
-- Injects `"thinking":{"type":"adaptive"}` and forces `"stream":true` for Claude
-- Injects `"output_config":{"effort":"..."}`
-- Reads effort from `AppPreferences.opus47ThinkingEffort` or `AppPreferences.sonnet46ThinkingEffort`
-- Injects Codex reasoning for exact models `gpt-5.3-codex` and `gpt-5.4`
-- Injects `"reasoning":{"effort":"..."}`
-- Reads effort from `AppPreferences.gpt53CodexReasoningEffort` or `AppPreferences.gpt54ReasoningEffort`
-- Injects Gemini thinking levels for `gemini-3.1-pro-preview` and `gemini-3-flash-preview`
-- Rewrites the model name to append a suffix (e.g. `gemini-3.1-pro-preview(high)`) which CLIProxyAPIPlus parses via its `ParseSuffix` logic
-- Reads level from `AppPreferences.gemini31ProThinkingLevel` or `AppPreferences.gemini3FlashThinkingLevel`
-- Optionally injects `"service_tier":"priority"` for `gpt-5.4` on Responses API paths (`/v1/responses`, `/api/v1/responses`) when `AppPreferences.gpt54FastMode` is enabled and the client did not already set `service_tier`
-- Preserves JSON key order by editing the raw JSON string instead of re-serializing
-- **Max Budget Mode**: When `AppPreferences.claudeMaxBudgetMode` is enabled, forces streaming and applies a Sonnet-4.6-only override: classic extended thinking with `budget_tokens=63999` / `max_tokens=64000` / `effort=max`. Opus 4.7 is unaffected and continues to receive `thinking.type=adaptive` with `output_config.effort` from `AppPreferences.opus47ThinkingEffort`.
+- Claude adaptive thinking for models containing `opus-4-7` or
+  `sonnet-4-6`. Injects `"thinking":{"type":"adaptive"}` and
+  `"output_config":{"effort":"..."}`, forces `"stream":true`. Effort
+  comes from `Preferences.opus47_thinking_effort` /
+  `Preferences.sonnet46_thinking_effort`.
+- Codex reasoning for exact models `gpt-5.3-codex` and `gpt-5.4`.
+  Injects `"reasoning":{"effort":"..."}`. Effort from
+  `Preferences.gpt53_codex_reasoning_effort` /
+  `Preferences.gpt54_reasoning_effort`.
+- Gemini thinking levels for `gemini-3.1-pro-preview` and
+  `gemini-3-flash-preview`. Injects
+  `"generationConfig":{"thinkingConfig":{"thinking_level":"..."}}`.
+  Level from `Preferences.gemini31_pro_thinking_level` /
+  `Preferences.gemini3_flash_thinking_level`.
+- Fast mode: injects `"service_tier":"priority"` when
+  `/v1/responses` or `/api/v1/responses` is hit with `gpt-5.4` /
+  `gpt-5.3-codex` and the matching `*_fast_mode` preference is on and
+  the client did not already set `service_tier`.
+- Max Budget Mode: when `Preferences.claude_max_budget_mode` is on,
+  Sonnet 4.6 requests get classic extended thinking
+  (`max_tokens=64000`, `thinking={"type":"enabled","budget_tokens":63999}`,
+  `output_config={"effort":"max"}`). Opus 4.7 is intentionally
+  unaffected and keeps its adaptive path.
+- Gemini on Responses API: rewrites `/v1/responses` →
+  `/v1/chat/completions` (and the `/api/` twin) when the JSON body's
+  `model` starts with `gemini-`, because CLIProxyAPIPlus does not expose
+  Gemini via the Responses API.
 
-What it does not do anymore:
+What it deliberately does not do:
 
-- It does not strip or normalize model suffixes
-- It does not send `thinking.budget_tokens` to Opus 4.7 (rejected with 400)
-- It does not add `anthropic-beta` interleaved-thinking headers (adaptive thinking enables interleaving automatically)
-- It does not implement the old `-thinking-N` / suffix-based branching documented in stale docs
+- Does not strip or normalize model suffixes.
+- Does not send `thinking.budget_tokens` to Opus 4.7 (rejected with 400).
+- Does not add `anthropic-beta` interleaved-thinking headers (adaptive
+  thinking enables interleaving automatically).
+- Does not implement any `-thinking-N` suffix-based branching from the
+  legacy Swift docs.
+- Does not retry on upstream 404 with `/api/` prefix (the old Swift
+  helper was dead code).
 
 ### Amp routing
 
-`ThinkingProxy` also handles Amp-specific routing:
+Port of the Swift Amp passthrough:
 
-- `/auth/cli-login` and `/api/auth/cli-login` are redirected directly to `https://ampcode.com/...`
-- `/provider/*` is rewritten to `/api/provider/*`
-- Requests that are not provider requests and not `/v1/*` or `/api/v1/*` are treated as Amp management requests and forwarded to `ampcode.com`
-- Amp response `Location` headers and cookie domains are rewritten so browser flows continue working through localhost
+- `/auth/cli-login` and `/api/auth/cli-login` → 302 to
+  `https://ampcode.com/...` (strips the `/api/` prefix).
+- `/provider/*` is rewritten to `/api/provider/*`.
+- Any non-`/api/provider/*` and non-`/v1/*` / non-`/api/v1/*` path is
+  treated as an Amp management request and forwarded to
+  `https://ampcode.com` with Location and cookie-domain rewrites so the
+  browser stays on localhost.
 
 ## Auth And Providers
 
-The current app/UI exposes three provider types:
+Provider keys exposed in the UI: `claude`, `codex`, `gemini`.
 
-- `claude`
-- `codex`
-- `gemini`
-
-Auth data lives in `~/.cli-proxy-api/` as JSON files. `AuthManager` scans that directory and reads fields like:
+Auth data lives in `~/.cli-proxy-api/` as JSON files, managed by the Go
+binary. `AuthManager` reads:
 
 - `type`
 - `email`
 - `login`
-- `expired`
+- `expired` (parsed as ISO-8601 with or without fractional seconds)
 - `disabled`
 
-Behavior to know:
+Behavior to preserve:
 
-- Multiple accounts per provider are supported
-- Per-account disable/enable is supported via the `disabled` field in each auth JSON
-- The last enabled account for a provider cannot be disabled
-- Provider-level toggles in `SettingsView` are separate from per-account disable flags
-- Provider-level disable writes `oauth-excluded-models` into `~/.cli-proxy-api/merged-config.yaml`
-- `CLIProxyAPIPlus` hot-reloads config changes, so provider enable/disable does not require a restart
-- The app watches `~/.cli-proxy-api/` for changes from both `AppDelegate` and `SettingsView`
+- Multiple accounts per provider.
+- Per-account disable/enable via the `disabled` field.
+- The last enabled account for a provider cannot be disabled (guard
+  lives in `AuthManager.toggle_disabled`).
+- Provider-level toggles in the web UI are separate from per-account
+  disable flags.
+- Provider-level disable writes `oauth-excluded-models` into
+  `~/.cli-proxy-api/merged-config.yaml` (generated by
+  `ServerManager._write_merged_config`, 0600 perms, atomic rename).
+- `cli-proxy-api-plus` hot-reloads `merged-config.yaml`, so provider
+  enable/disable never restarts the subprocess.
+- `AuthWatcher` (`watchdog.Observer`) rescans `~/.cli-proxy-api/` with
+  ~0.5 s debounce and pushes full snapshots over
+  `GET /api/auth/stream` (SSE).
+
+## Preferences
+
+`src/src/droidproxy/prefs.py` is a TOML-backed replacement for
+`AppPreferences.swift`. The file lives at
+`$XDG_CONFIG_HOME/droidproxy/config.toml`.
+
+Keys + defaults (must match the macOS Swift defaults -- changing these
+invalidates user installs):
+
+| Key | Default | Valid |
+|---|---|---|
+| `opus47_thinking_effort` | `xhigh` | `low/medium/high/xhigh/max` |
+| `sonnet46_thinking_effort` | `high` | `low/medium/high/max` |
+| `gpt53_codex_reasoning_effort` | `high` | `low/medium/high/xhigh` |
+| `gpt54_reasoning_effort` | `high` | `low/medium/high/xhigh` |
+| `gemini31_pro_thinking_level` | `high` | `low/medium/high` |
+| `gemini3_flash_thinking_level` | `high` | `minimal/low/medium/high` |
+| `gpt53_codex_fast_mode` | `false` | bool |
+| `gpt54_fast_mode` | `false` | bool |
+| `claude_max_budget_mode` | `false` | bool |
+| `allow_remote` | `false` | bool |
+| `secret_key` | `""` | string |
+| `oled_theme` | `false` | bool |
+| `enabled_providers` | `{claude: true, codex: true, gemini: true}` | dict[str, bool] |
+
+Writes are atomic via `tempfile` + `os.replace`. `PreferencesStore` is a
+thread-safe singleton; always go through `get_store()` so the web UI,
+proxy, and tray see the same state.
 
 ## Key Files
 
 | File | Role |
 |---|---|
-| `src/Sources/AppDelegate.swift` | App lifecycle, menu bar UI, settings window, notifications, Sparkle updater, auth-directory watcher, startup ordering for the two local servers. |
-| `src/Sources/ServerManager.swift` | Starts/stops bundled `cli-proxy-api-plus`, captures logs, merges config, handles provider enable/disable, runs Claude/Codex/Gemini login commands, and kills orphaned backend processes. |
-| `src/Sources/ThinkingProxy.swift` | Raw TCP HTTP proxy for thinking injection plus Amp request/response rewriting. |
-| `src/Sources/SettingsView.swift` | SwiftUI settings UI for server status, launch-at-login, provider toggles, auth flows, and per-model effort pickers. |
-| `src/Sources/AuthStatus.swift` | `AuthManager`, account parsing, expiry detection, file deletion, and per-account disabled-state updates. |
-| `src/Sources/AppPreferences.swift` | UserDefaults-backed effort preferences for Opus 4.7, Sonnet 4.6, GPT 5.3 Codex, GPT 5.4, Gemini 3.1 Pro, and Gemini 3 Flash, plus fast mode toggles. |
-| `src/Sources/Resources/config.yaml` | Bundled CLIProxyAPIPlus config (`port: 8318`, localhost binding, Amp upstream settings, auth dir). |
-| `src/Info.plist` | Bundle metadata. Current source-of-truth values include app name `DroidProxy`, bundle ID `com.droidproxy.app`, and Sparkle feed URL on `anand-92/droidproxy`. |
+| `src/src/droidproxy/cli.py` | argparse entry point (`droidproxy` command), subcommands (`tray`, `daemon`, `install-droids`, `install-models`, `install-binary`, `doctor`, `check-update`, `paths`). |
+| `src/src/droidproxy/app.py` | Daemon / tray orchestrator, startup order, SIGTERM handling, asyncio/GTK thread split. |
+| `src/src/droidproxy/context.py` | `AppContext` dataclass that owns every singleton (`prefs`, `server`, `proxy`, `auth_manager`, `auth_watcher`, `tunnel`, `updater`). |
+| `src/src/droidproxy/proxy.py` | aiohttp HTTP proxy on port 8317 (inbound path rewrites, Amp passthrough, streaming passthrough, upstream forwarder). |
+| `src/src/droidproxy/injector.py` | Pure, unit-testable JSON field surgery used by the proxy. Regex identical to Swift. |
+| `src/src/droidproxy/backend.py` | `ServerManager` -- spawns `cli-proxy-api-plus`, captures logs into a ring buffer, runs `-claude-login` / `-codex-login` / `-login` with the same stdin-nudging timings as Swift, kills orphans via `psutil`. |
+| `src/src/droidproxy/binary.py` | Downloads + SHA-256-verifies the pinned upstream release from `router-for-me/CLIProxyAPIPlus`. `PINNED_VERSION` is bumped by `.github/workflows/update-cliproxyapi-linux.yml`. |
+| `src/src/droidproxy/auth.py` | `AuthManager` + `AuthWatcher` -- watchdog-backed rescan of `~/.cli-proxy-api/*.json` with SSE broadcast. |
+| `src/src/droidproxy/prefs.py` | `PreferencesStore` with atomic TOML persistence and a `get_store()` singleton. |
+| `src/src/droidproxy/web.py` | aiohttp settings UI + `/api/*` endpoints (`status`, `prefs`, `auth`, `server`, `logs`, `factory/models`, `tunnel`, `droids`). |
+| `src/src/droidproxy/tray.py` | `AyatanaAppIndicator3` tray menu. `gi` is imported lazily inside `run()` so `daemon` mode works without GTK. |
+| `src/src/droidproxy/tunnel.py` | Optional `cloudflared` wrapper. Parses `https://*.trycloudflare.com` from stderr/stdout. |
+| `src/src/droidproxy/updater.py` | GitHub release poller + install-method router (AppImage / pipx / AUR / source). No Sparkle equivalent. |
+| `src/src/droidproxy/installer.py` | `install_challenger_droids` (copies `.md` into `~/.factory/`) and `install_factory_custom_models` (merges DroidProxy entries into `~/.factory/settings.json`, preserves other keys, scrubs legacy + `custom:CC:*` IDs). |
+| `src/src/droidproxy/paths.py` | XDG-aware path helpers (`config_dir`, `data_dir`, `state_dir`, `auth_dir`, `cli_proxy_api_binary`, resource lookups). |
+| `src/src/droidproxy/resources/config.yaml` | Bundled CLIProxyAPIPlus config template. Merged with user prefs into `~/.cli-proxy-api/merged-config.yaml` at runtime. |
+| `src/src/droidproxy/resources/web/` | Vanilla JS settings page served by `WebUI`. |
+| `src/tests/` | 95 tests (pytest + pytest-asyncio). `test_injector.py` is the prompt-caching parity contract -- treat any failure there as a production bug. |
+
+## Factory Integration
+
+Two helpers in `installer.py`, both mirrored as web endpoints and CLI
+subcommands:
+
+| Action | CLI | Endpoint | Effect |
+|---|---|---|---|
+| Apply DroidProxy models | `droidproxy install-models` | `POST /api/factory/models/apply` | Merges `DROID_PROXY_MODELS` into `~/.factory/settings.json`, scrubs `custom:droidproxy:*` + `custom:droidproxy:opus-4-6` (legacy) + `custom:CC:*`, re-indexes after user-added models, skips disabled-provider models. Atomic write. |
+| Install Challenger Droids | `droidproxy install-droids` | `POST /api/droids/install` | Copies the bundled `.md` files into `~/.factory/droids/` and `~/.factory/commands/`. |
+
+Both respect the provider toggle state in `Preferences.enabled_providers`.
 
 ## Conventions
 
-- Use `NSLog`, not `print` or `os_log`
-- Prefer updating the app under `src/`, not the mirrored top-level `resources/` directory
-- Treat `DroidProxy.app`, `CLIProxyMenuBar`, and `com.droidproxy.app` as the active app identity
-- `CLIProxyAPIPlus` is bundled as `src/Sources/Resources/cli-proxy-api-plus`
-- `ThinkingProxy` uses surgical string insertion for JSON edits to preserve cache-sensitive key ordering
-- Local backend traffic is intended to stay on localhost only (`127.0.0.1:8318`)
-- `TunnelManager.swift` exists in `src/Sources/` but is currently not wired into the app flow
+- Use the standard library `logging` module (`log = logging.getLogger(__name__)`),
+  never `print()` in runtime modules. `ThinkingProxy` additionally mirrors
+  key events to `/tmp/droidproxy-debug.log` for parity with the macOS
+  `ThinkingProxy.fileLog`.
+- Keep the `src/src/droidproxy/injector.py` regex + semantics
+  byte-identical to the Swift original. The comment block at the top of
+  `injector.py` documents the contract. Any refactor that changes its
+  output bytes is a production regression (prompt caching breaks).
+- Do not re-serialise JSON request bodies in the proxy path; always
+  edit the raw string.
+- Tray code is optional. Nothing else in the package may import `gi` /
+  `gtk` at module scope -- tests run on headless CI. If you need GTK,
+  put it inside a function and guard with `TrayUnavailableError`.
+- Local backend traffic stays on `127.0.0.1:8318`. Flip `allow-remote`
+  only via the `remote-management` section of the merged config, which
+  is driven by the `allow_remote` / `secret_key` prefs.
+- Always run `ruff check src/src src/tests` and
+  `python -m pytest src/tests` before committing.
+- Preserve the `src/` src-layout. Package code lives at
+  `src/src/droidproxy/`; do not flatten.
+- Every preference change goes through `PreferencesStore.update` or
+  `set_provider_enabled`, which handle validation + atomic persist.
+  Never write `config.toml` directly.
 
 ## Release Notes For Agents
 
-The repo still contains stale VibeProxy-era references outside the active runtime path. Before changing release automation, double-check names and URLs against current files.
+Release pipeline for the Linux port:
 
-Known drift includes some combinations of:
+- CI: `.github/workflows/linux-release.yml` on `v*` tags. Builds
+  x86_64 + aarch64 AppImages (with `.zsync`), publishes the wheel /
+  sdist artifacts, and attaches everything to the GitHub release via
+  `softprops/action-gh-release`.
+- Upstream bump automation: `.github/workflows/update-cliproxyapi-linux.yml`
+  runs every 12 h, checks for a new `router-for-me/CLIProxyAPIPlus`
+  release, and opens a PR that bumps `PINNED_VERSION` in
+  `src/src/droidproxy/binary.py`. The binary itself is not vendored --
+  it downloads at first launch with a SHA-256 check against upstream
+  `checksums.txt`.
+- Distribution: AppImage (primary), PyPI wheel (`pipx install droidproxy`),
+  and AUR (`droidproxy` source + `droidproxy-bin` AppImage). PKGBUILDs
+  live in `src/packaging/`. Before pushing to AUR, populate real
+  `sha256sums` with `updpkgsums` against the GitHub release, regenerate
+  `.SRCINFO` with `makepkg --printsrcinfo > .SRCINFO`, and push to the
+  package-specific `ssh://aur@aur.archlinux.org/<pkgname>.git` repo.
+- There is no Sparkle, notarization, code-signing, or `.icns` build
+  step. The updater opens AppImageUpdate (if installed) for AppImage
+  users or prints an install-method-specific hint otherwise.
+- Version string lives in two places: `src/src/droidproxy/__init__.py`
+  (`__version__`) and `src/pyproject.toml` (`version = "..."`). Keep
+  them in sync when tagging.
 
-- `Makefile`
-- `scripts/create-release.sh`
-- `.github/workflows/release.yml`
-
-Those files still reference old names like `VibeProxy.app`, `automazeio/vibeproxy`, and legacy appcast URLs in places. If a task touches release tooling, audit it carefully instead of trusting the existing wording.
+Any task touching release tooling should verify against the current
+files -- do not trust older documents that reference `create-app-bundle.sh`,
+`appcast*.xml`, Sparkle signing, or the old macOS GitHub Actions
+workflow. Those have been removed.

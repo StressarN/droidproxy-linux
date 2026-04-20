@@ -1,6 +1,6 @@
 [Unit]
 Description=DroidProxy headless proxy for Factory Droid CLI
-Documentation=https://github.com/anand-92/droidproxy
+Documentation=https://github.com/StressarN/droidproxy-linux
 After=network-online.target
 Wants=network-online.target
 

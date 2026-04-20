@@ -65,7 +65,7 @@ async def test_check_for_updates_reports_newer(
             newer_available=True,
             install_method=InstallMethod.PIPX,
             upgrade_hint="pipx upgrade droidproxy",
-            html_url="https://github.com/anand-92/droidproxy/releases/tag/v1.9.0",
+            html_url="https://github.com/StressarN/droidproxy-linux/releases/tag/v1.9.0",
         )
 
     monkeypatch.setattr(Updater, "_fetch_update_info_blocking", _fake_blocking)

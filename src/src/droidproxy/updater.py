@@ -31,7 +31,9 @@ from droidproxy.paths import cache_dir
 
 log = logging.getLogger(__name__)
 
-LATEST_RELEASE_URL = "https://api.github.com/repos/anand-92/droidproxy/releases/latest"
+LATEST_RELEASE_URL = (
+    "https://api.github.com/repos/StressarN/droidproxy-linux/releases/latest"
+)
 DEFAULT_USER_AGENT = f"droidproxy-linux/{__version__}"
 CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 
