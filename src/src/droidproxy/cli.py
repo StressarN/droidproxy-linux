@@ -51,7 +51,26 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("tray", help="Run the GTK tray (default when no subcommand given).")
-    sub.add_parser("daemon", help="Run headless, without the GTK tray.")
+    daemon_cmd = sub.add_parser(
+        "daemon",
+        help="Run headless, without the GTK tray.",
+    )
+    daemon_cmd.add_argument(
+        "--detach",
+        "-d",
+        action="store_true",
+        help=(
+            "Double-fork into the background, redirect stdio to the log "
+            "file, and write a pidfile. Manage with `droidproxy stop` / "
+            "`droidproxy status`."
+        ),
+    )
+    sub.add_parser(
+        "stop", help="Send SIGTERM to the detached daemon and wait for it to exit."
+    )
+    sub.add_parser(
+        "status", help="Show whether the detached daemon is running."
+    )
     sub.add_parser("install-droids", help="Copy Challenger Droid configs to ~/.factory/.")
     sub.add_parser(
         "install-models",
@@ -96,7 +115,22 @@ def main(argv: list[str] | None = None) -> int:
     if command in (None, "tray"):
         return _run_tray_or_fallback(options)
     if command == "daemon":
+        if getattr(args, "detach", False):
+            from droidproxy.app import daemonize
+
+            # daemonize() is fatal-on-error: either we come back as the
+            # grandchild (real process) or SystemExit(1) because another
+            # daemon is already running.
+            daemonize()
         return run_daemon(options)
+    if command == "stop":
+        from droidproxy.app import stop_daemon
+
+        return stop_daemon()
+    if command == "status":
+        from droidproxy.app import daemon_status
+
+        return daemon_status()
     if command == "install-droids":
         return _install_droids()
     if command == "install-models":

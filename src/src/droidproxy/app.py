@@ -1,23 +1,32 @@
 """Process orchestration: runs proxy, backend, web UI, tray, and updater.
 
-Two entry points are supported:
+Three entry points are supported:
 
 * :func:`run_daemon` -- headless asyncio loop, waits for SIGINT/SIGTERM.
 * :func:`run_with_tray` -- starts asyncio in a background thread and runs
   the GTK main loop on the main thread so the tray stays responsive.
+* :func:`daemonize` -- classic double-fork that detaches from the
+  controlling terminal, redirects stdio to the log file, and writes a
+  pidfile. Combined with :func:`run_daemon` this gives a true background
+  mode: ``droidproxy daemon --detach``. Use :func:`stop_daemon` and
+  :func:`daemon_status` from ``cli.py`` to manage it.
 """
 
 from __future__ import annotations
 
 import asyncio
+import atexit
 import logging
+import os
 import signal
+import sys
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from droidproxy.context import AppContext
-from droidproxy.paths import icon_path
+from droidproxy.paths import icon_path, log_file, state_dir
 from droidproxy.proxy import ProxyConfig
 from droidproxy.tunnel import TunnelManager
 from droidproxy.updater import Updater
@@ -222,3 +231,190 @@ def _maybe_icon(name: str) -> Path | str | None:
     if path.exists():
         return str(path)
     return None
+
+
+# ---------------------------------------------------------------------------
+# Daemonization (double-fork) + pidfile management
+# ---------------------------------------------------------------------------
+
+
+def pidfile_path() -> Path:
+    """Where the detached daemon writes its pid.
+
+    Prefers ``$XDG_RUNTIME_DIR/droidproxy.pid`` (volatile tmpfs on most
+    distros, wiped on logout, which is the right thing for a user service).
+    Falls back to the state dir when ``XDG_RUNTIME_DIR`` is unset -- typically
+    inside a ``systemd --user`` unit that clears the env, or on a system
+    without user runtime dirs.
+    """
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        return Path(runtime_dir) / "droidproxy.pid"
+    return state_dir() / "droidproxy.pid"
+
+
+def _read_pidfile() -> int | None:
+    path = pidfile_path()
+    if not path.exists():
+        return None
+    try:
+        return int(path.read_text().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Process exists but we can't signal it (shouldn't happen for our
+        # own user's pid, but handle it anyway).
+        return True
+    # Zombie-reap path: if the pid is a child of ours that has exited but
+    # not yet been waited on, os.kill(pid, 0) still succeeds. waitpid with
+    # WNOHANG returns the pid in that case, which is our signal that the
+    # process is gone. If the pid is not our child, waitpid raises ECHILD,
+    # which we ignore. This makes _is_alive correct whether the daemon is
+    # orphaned (reaped by init, normal --detach flow) or a direct child
+    # (under test, or started without --detach).
+    try:
+        reaped_pid, _ = os.waitpid(pid, os.WNOHANG)
+        if reaped_pid == pid:
+            return False
+    except ChildProcessError:
+        pass
+    except OSError:
+        pass
+    return True
+
+
+def _write_pidfile(pid: int) -> Path:
+    path = pidfile_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Atomic write: tmp + rename.
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(f"{pid}\n")
+    tmp.replace(path)
+    return path
+
+
+def _remove_pidfile() -> None:
+    try:
+        pidfile_path().unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def daemonize(log_path: Path | None = None) -> None:
+    """Double-fork into the background; parent exits inside this call.
+
+    On return, only the grandchild process is alive. Its stdin is
+    ``/dev/null``, stdout and stderr go to ``log_path`` (default: the
+    rotating log file under ``$XDG_STATE_HOME/droidproxy/``), it is a
+    session leader with no controlling terminal, and its pid has been
+    written to :func:`pidfile_path`.
+
+    Raises :class:`SystemExit` with a non-zero status if another live
+    daemon is already running.
+    """
+    existing = _read_pidfile()
+    if existing is not None and _is_alive(existing):
+        print(
+            f"droidproxy is already running (pid {existing}). "
+            f"Use `droidproxy stop` to terminate it first.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if existing is not None:
+        # Stale pidfile: the old process is gone, reclaim it.
+        _remove_pidfile()
+
+    # First fork: detach from shell
+    if os.fork() != 0:
+        os._exit(0)
+
+    # Become session leader so we don't inherit the shell's process group
+    os.setsid()
+
+    # Second fork: ensure we can't reacquire a controlling terminal
+    if os.fork() != 0:
+        os._exit(0)
+
+    # Change to a stable directory so we don't hold any CWD busy
+    os.chdir("/")
+    os.umask(0o022)
+
+    # Redirect stdio: devnull in, log file out+err
+    path = log_path or log_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    devnull_fd = os.open(os.devnull, os.O_RDONLY)
+    log_fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    os.dup2(devnull_fd, 0)
+    os.dup2(log_fd, 1)
+    os.dup2(log_fd, 2)
+    os.close(devnull_fd)
+    os.close(log_fd)
+
+    _write_pidfile(os.getpid())
+    atexit.register(_remove_pidfile)
+
+
+def stop_daemon(timeout: float = 5.0) -> int:
+    """Send SIGTERM to the detached daemon and wait for it to exit.
+
+    Returns a shell-style exit code: 0 on success, 1 on "not running",
+    2 on "force-killed after timeout".
+    """
+    pid = _read_pidfile()
+    if pid is None:
+        print("droidproxy is not running (no pidfile)", file=sys.stderr)
+        return 1
+    if not _is_alive(pid):
+        print(f"droidproxy pidfile points at dead pid {pid}; cleaning up")
+        _remove_pidfile()
+        return 1
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        _remove_pidfile()
+        print(f"droidproxy already gone (pid {pid})")
+        return 1
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _is_alive(pid):
+            _remove_pidfile()
+            print(f"droidproxy stopped (pid {pid})")
+            return 0
+        time.sleep(0.1)
+
+    # Graceful shutdown didn't complete in time: escalate
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    _remove_pidfile()
+    print(f"droidproxy force-killed after {timeout}s timeout (pid {pid})")
+    return 2
+
+
+def daemon_status() -> int:
+    """Report whether the detached daemon is running.
+
+    Exit codes follow the LSB service-status convention:
+    0 running, 3 stopped, 4 stale pidfile.
+    """
+    pid = _read_pidfile()
+    if pid is None:
+        print("droidproxy: stopped")
+        return 3
+    if _is_alive(pid):
+        print(f"droidproxy: running (pid {pid}, pidfile {pidfile_path()})")
+        return 0
+    print(f"droidproxy: stale pidfile (pid {pid} no longer exists)")
+    return 4
