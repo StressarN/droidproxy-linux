@@ -297,9 +297,34 @@ Release pipeline:
 - No Sparkle, notarization, code-signing, `.icns`. Updater
   opens AppImageUpdate (if installed) for AppImage
   users or prints install-method hint.
-- Version in two places: `src/src/droidproxy/__init__.py`
-  (`__version__`) and `src/pyproject.toml` (`version = "..."`). Keep
-  in sync when tagging.
+- Version in four places: `src/src/droidproxy/__init__.py`
+  (`__version__`), `src/pyproject.toml` (`version = "..."`),
+  `src/packaging/PKGBUILD` (`pkgver=...`), and
+  `src/packaging/PKGBUILD-bin` (`pkgver=...`). Use
+  `scripts/bump-version.sh` instead of hand-editing.
+
+## Helper Scripts
+
+All release + AUR plumbing lives in `scripts/`. Each script sources
+`scripts/_lib.sh` for shared helpers (`require_cmd`,
+`require_clean_tree`, `check_aur_ssh`, `check_github_tag`, version
+readers, an EXIT-trap cleanup registry).
+
+| Script | Purpose |
+|---|---|
+| `scripts/bump-version.sh <X.Y.Z>` | Rewrites every `version=`/`__version__`/`pkgver=` string, resets `pkgrel=1`, runs pytest + ruff against `src/.venv`, then `git commit` + annotated `git tag vX.Y.Z`. Does not push -- prints the exact push command. |
+| `scripts/test-pkgbuild.sh [--source\|--bin]` | Local `makepkg` dry-run. `--source` (default) packages HEAD via `git archive` + a `file://` `source=` override so no GitHub tag is required. `--bin` exercises the AppImage PKGBUILD against the real `v$pkgver` release. Both install the built package, run `droidproxy --version`, uninstall, and lint via `namcap`. |
+| `scripts/publish-aur.sh [--source\|--bin\|--both]` | Full AUR push. Preflights AUR SSH auth + that `v$pkgver` exists on `origin`. For each selected variant: `updpkgsums` + `makepkg -sri` + smoke-test + `pacman -R` + `.SRCINFO` regen, then clones `ssh://aur@aur.archlinux.org/<pkgname>.git`, commits, pushes `origin master`. EXIT trap cleans up scratch dirs. |
+
+Typical release flow:
+
+```bash
+scripts/bump-version.sh 1.8.10
+git push origin main v1.8.10          # triggers linux-release.yml
+scripts/test-pkgbuild.sh              # local dry-run, no release needed
+# ...wait for CI to attach AppImages to the v1.8.10 release...
+scripts/publish-aur.sh --both         # AUR push for both packages
+```
 
 Tasks touching release tooling: verify against current
 files -- don't trust older docs referencing `create-app-bundle.sh`,
