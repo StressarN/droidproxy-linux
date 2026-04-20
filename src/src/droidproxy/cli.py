@@ -65,6 +65,20 @@ def _build_parser() -> argparse.ArgumentParser:
             "`droidproxy status`."
         ),
     )
+    gui_cmd = sub.add_parser(
+        "gui",
+        help="Open the settings web UI in your browser; start the daemon if needed.",
+    )
+    gui_cmd.add_argument(
+        "--no-start",
+        action="store_true",
+        help="Do not start the daemon if it's not running; just print the URL if the UI is unreachable.",
+    )
+    gui_cmd.add_argument(
+        "--print-url",
+        action="store_true",
+        help="Print the URL and exit without opening a browser.",
+    )
     sub.add_parser(
         "stop", help="Send SIGTERM to the detached daemon and wait for it to exit."
     )
@@ -131,6 +145,12 @@ def main(argv: list[str] | None = None) -> int:
         from droidproxy.app import daemon_status
 
         return daemon_status()
+    if command == "gui":
+        return _open_gui(
+            options,
+            start_if_needed=not args.no_start,
+            print_url_only=args.print_url,
+        )
     if command == "install-droids":
         return _install_droids()
     if command == "install-models":
@@ -175,6 +195,110 @@ def _install_droids() -> int:
     print(f"Installed droids: {droids}")
     print(f"Installed commands: {commands}")
     return 0
+
+
+def _open_gui(
+    options: AppOptions,
+    *,
+    start_if_needed: bool,
+    print_url_only: bool,
+) -> int:
+    import os
+    import shutil
+    import socket
+    import subprocess
+    import time
+    import webbrowser
+
+    url = f"http://127.0.0.1:{options.web_port}/"
+
+    def _port_open(host: str, port: int, timeout: float = 0.3) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            return False
+
+    reachable = _port_open("127.0.0.1", options.web_port)
+
+    if not reachable:
+        if not start_if_needed:
+            print(
+                f"Settings UI is not reachable at {url}.\n"
+                f"Start it with:  droidproxy daemon --detach",
+                file=sys.stderr,
+            )
+            return 1
+
+        print("Starting droidproxy daemon in the background...")
+        # Launch ourselves in daemon --detach mode. Use sys.argv[0] so we
+        # preserve whatever entry point the user invoked (system /usr/bin,
+        # pipx venv, editable checkout, or AppImage AppRun).
+        cmd = [sys.argv[0], "daemon", "--detach"]
+        if options.web_port != 8316:
+            cmd.extend(["--web-port", str(options.web_port)])
+        if options.proxy_config.listen_port != 8317:
+            cmd.extend(["--proxy-port", str(options.proxy_config.listen_port)])
+        if options.proxy_config.upstream_port != 8318:
+            cmd.extend(["--upstream-port", str(options.proxy_config.upstream_port)])
+
+        try:
+            subprocess.run(cmd, check=True)
+        except (FileNotFoundError, subprocess.CalledProcessError) as err:
+            print(f"Failed to start daemon: {err}", file=sys.stderr)
+            return 1
+
+        # Wait for the UI to actually come up (bounded).
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if _port_open("127.0.0.1", options.web_port):
+                reachable = True
+                break
+            time.sleep(0.2)
+
+        if not reachable:
+            print(
+                f"Started the daemon but {url} didn't answer within 10s.\n"
+                f"Check:  droidproxy status  and  ~/.local/state/droidproxy/droidproxy.log",
+                file=sys.stderr,
+            )
+            return 1
+
+    if print_url_only:
+        print(url)
+        return 0
+
+    # Open in the user's default browser. Prefer xdg-open (honours the
+    # distro's default handler on Wayland / X11 / Hyprland). Fall back to
+    # Python's webbrowser module, and finally to just printing the URL.
+    opener = shutil.which("xdg-open")
+    if opener is not None:
+        try:
+            subprocess.Popen(
+                [opener, url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                env=os.environ.copy(),
+                start_new_session=True,
+            )
+            print(f"Opened {url}")
+            return 0
+        except OSError as err:
+            print(f"xdg-open failed ({err}); trying webbrowser module", file=sys.stderr)
+
+    try:
+        if webbrowser.open(url, new=2):
+            print(f"Opened {url}")
+            return 0
+    except webbrowser.Error:
+        pass
+
+    print(
+        f"Could not launch a browser. Open this URL manually:\n\n    {url}\n",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def _install_models() -> int:
