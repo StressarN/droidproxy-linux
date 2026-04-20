@@ -4,7 +4,9 @@ script:
   - mkdir -p AppDir
   - python -m pip install --target=AppDir/usr/lib/python3/dist-packages --no-compile ..
   - mkdir -p AppDir/usr/bin
+  - mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
   - cp ../src/droidproxy/resources/icon-active.png AppDir/droidproxy.png
+  - cp ../src/droidproxy/resources/icon-active.png AppDir/usr/share/icons/hicolor/256x256/apps/droidproxy.png
 
 AppDir:
   path: ./AppDir
@@ -35,8 +37,6 @@ AppDir:
       - xdg-utils
 
   files:
-    include:
-      - /usr/share/icons/hicolor/**/apps/droidproxy.*
     exclude:
       - usr/share/man
       - usr/share/doc
