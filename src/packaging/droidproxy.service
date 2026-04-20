@@ -6,7 +6,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/droidproxy daemon
+# Resolve `droidproxy` via PATH so both the AUR package (/usr/bin/droidproxy)
+# and the pipx install (~/.local/bin/droidproxy) are supported.
+ExecStart=/usr/bin/env droidproxy daemon
+# SIGINT triggers the asyncio signal handler in run_daemon(), which cleanly
+# stops the proxy, web UI, and the cli-proxy-api-plus subprocess.
+KillSignal=SIGINT
+TimeoutStopSec=10
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
