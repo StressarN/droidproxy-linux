@@ -45,6 +45,5 @@ AppDir:
 
 AppImage:
   update-information: "gh-releases-zsync|anand-92|droidproxy|latest|DroidProxyLinux-x86_64.AppImage.zsync"
-  sign-key: None
   arch: x86_64
   file_name: DroidProxyLinux-x86_64.AppImage
