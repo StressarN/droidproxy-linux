@@ -4,7 +4,11 @@ _realname=droidproxy
 pkgver=1.8.10
 pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (AppImage)"
-arch=('x86_64' 'aarch64')
+# Only x86_64 AppImages are built by .github/workflows/linux-release.yml today.
+# aarch64 users should install the source package `droidproxy-linux` instead
+# (arch=('any'), pure Python). If CI starts producing aarch64 AppImages,
+# re-add 'aarch64' here plus source_aarch64=/sha256sums_aarch64= lines.
+arch=('x86_64')
 url="https://github.com/StressarN/droidproxy-linux"
 license=('MIT')
 depends=('fuse2')
@@ -14,22 +18,14 @@ optdepends=(
 provides=('droidproxy')
 conflicts=('droidproxy' 'droidproxy-linux')
 source_x86_64=("DroidProxyLinux-x86_64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-x86_64.AppImage")
-source_aarch64=("DroidProxyLinux-aarch64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-aarch64.AppImage")
 source=(
     "droidproxy.desktop::$url/raw/main/src/packaging/droidproxy.desktop"
 )
 sha256sums_x86_64=('SKIP')
-sha256sums_aarch64=('SKIP')
 sha256sums=('SKIP')
 
 package() {
-    local arch_suffix
-    case "$CARCH" in
-        x86_64) arch_suffix="x86_64" ;;
-        aarch64) arch_suffix="aarch64" ;;
-        *) echo "Unsupported arch: $CARCH" >&2; exit 1 ;;
-    esac
-    install -Dm755 "DroidProxyLinux-${arch_suffix}.AppImage" \
+    install -Dm755 "DroidProxyLinux-${CARCH}.AppImage" \
         "$pkgdir/opt/droidproxy/droidproxy.AppImage"
     install -d "$pkgdir/usr/bin"
     ln -s "/opt/droidproxy/droidproxy.AppImage" "$pkgdir/usr/bin/${_realname}"
