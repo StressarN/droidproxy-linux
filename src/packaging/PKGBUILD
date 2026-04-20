@@ -1,10 +1,10 @@
-# Maintainer: DroidProxy Linux <droidproxy@localhost>
+# Maintainer: StressarN <martin.gustavsen@kreatell.com>
 pkgname=droidproxy
 pkgver=1.8.7
 pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (Linux port)"
 arch=('any')
-url="https://github.com/anand-92/droidproxy"
+url="https://github.com/StressarN/droidproxy-linux"
 license=('MIT')
 depends=(
     'python>=3.11'
