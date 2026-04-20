@@ -44,10 +44,15 @@ for pkgbuild in src/packaging/PKGBUILD src/packaging/PKGBUILD-bin; do
         "$pkgbuild"
 done
 
+# AppImageBuilder app_info.version is displayed by AppImage tooling.
+sed -i "s/^    version: \"$CURRENT\"$/    version: \"$NEW_VERSION\"/" \
+    src/packaging/AppImageBuilder.yml
+
 # --- verify the sed actually landed -----------------------------------------
 
 for f in src/pyproject.toml src/src/droidproxy/__init__.py \
-         src/packaging/PKGBUILD src/packaging/PKGBUILD-bin; do
+         src/packaging/PKGBUILD src/packaging/PKGBUILD-bin \
+         src/packaging/AppImageBuilder.yml; do
     if ! grep -q "$NEW_VERSION" "$f"; then
         fail "$NEW_VERSION not found in $f after sed -- revert with 'git checkout -- $f'"
     fi
@@ -77,7 +82,8 @@ if ! confirm "Commit and tag v$NEW_VERSION?"; then
 fi
 
 git add src/pyproject.toml src/src/droidproxy/__init__.py \
-        src/packaging/PKGBUILD src/packaging/PKGBUILD-bin
+        src/packaging/PKGBUILD src/packaging/PKGBUILD-bin \
+        src/packaging/AppImageBuilder.yml
 git commit -m "chore: bump to $NEW_VERSION"
 git tag -a "v$NEW_VERSION" -m "DroidProxy Linux $NEW_VERSION"
 

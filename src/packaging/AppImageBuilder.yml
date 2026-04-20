@@ -15,8 +15,8 @@ AppDir:
     id: io.automaze.droidproxy
     name: DroidProxy
     icon: droidproxy
-    version: "1.8.8"
-    exec: usr/bin/python3
+    version: "1.8.11"
+    exec: usr/bin/python3.12
     exec_args: >-
       -E -s
       -c "from droidproxy.cli import main; import sys; sys.exit(main())"
@@ -25,10 +25,15 @@ AppDir:
   apt:
     arch: amd64
     sources:
-      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ jammy main universe"
+      # Ubuntu 24.04 LTS (noble) ships Python 3.12. droidproxy requires 3.11+
+      # because it uses tomllib, StrEnum, datetime.UTC, and typing.Self --
+      # jammy's Python 3.10 fails at import time with
+      # "cannot import name 'UTC' from 'datetime'".
+      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ noble main universe"
         key_url: "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
     include:
-      - python3
+      - python3.12
+      - python3.12-minimal
       - python3-gi
       - gir1.2-gtk-3.0
       - gir1.2-ayatanaappindicator3-0.1
