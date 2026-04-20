@@ -2,7 +2,7 @@
 pkgname=droidproxy-linux-bin
 _realname=droidproxy
 pkgver=1.8.10
-pkgrel=1
+pkgrel=2
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (AppImage)"
 # Only x86_64 AppImages are built by .github/workflows/linux-release.yml today.
 # aarch64 users should install the source package `droidproxy-linux` instead
@@ -17,6 +17,12 @@ optdepends=(
 )
 provides=('droidproxy')
 conflicts=('droidproxy' 'droidproxy-linux')
+# AppImages are self-contained ELF + squashfs payload. makepkg's strip/debug
+# passes treat the whole file as a regular ELF and clobber the squashfs
+# offset, producing an unrunnable AppImage ("This doesn't look like a
+# squashfs image"). Disable those passes, plus lto, which makes no sense for
+# a pre-built binary.
+options=(!strip !debug !lto)
 source_x86_64=("DroidProxyLinux-x86_64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-x86_64.AppImage")
 source=(
     "droidproxy.desktop::$url/raw/main/src/packaging/droidproxy.desktop"

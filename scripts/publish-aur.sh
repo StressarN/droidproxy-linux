@@ -63,9 +63,22 @@ publish_one() {
     makepkg -sri --noconfirm
 
     info "droidproxy --version"
+    # Run through a real tempfile so failures surface instead of being
+    # swallowed by the `$()` command substitution.
+    local version_out
+    version_out="$(mktemp)"
+    register_cleanup "$version_out"
+    if ! droidproxy --version >"$version_out" 2>&1; then
+        warn "droidproxy --version failed; output:"
+        cat "$version_out" >&2 || true
+        sudo pacman -R --noconfirm "$pkgname" || true
+        fail "installed $pkgname is broken -- not pushing to AUR"
+    fi
     local installed_version
-    installed_version="$(droidproxy --version | awk '{print $2}')"
+    installed_version="$(awk '{print $2}' "$version_out")"
     if [[ "$installed_version" != "$PKGVER" ]]; then
+        cat "$version_out" >&2 || true
+        sudo pacman -R --noconfirm "$pkgname" || true
         fail "installed droidproxy --version ($installed_version) != pkgver ($PKGVER)"
     fi
 
