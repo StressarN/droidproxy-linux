@@ -1,0 +1,39 @@
+# Maintainer: DroidProxy Linux <droidproxy@localhost>
+pkgname=droidproxy-bin
+_realname=droidproxy
+pkgver=1.8.7
+pkgrel=1
+pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (AppImage)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/anand-92/droidproxy"
+license=('MIT')
+depends=('fuse2')
+optdepends=(
+    'cloudflared: expose the proxy to the public internet'
+)
+provides=('droidproxy')
+conflicts=('droidproxy')
+source_x86_64=("DroidProxyLinux-x86_64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-x86_64.AppImage")
+source_aarch64=("DroidProxyLinux-aarch64.AppImage::$url/releases/download/v${pkgver}/DroidProxyLinux-aarch64.AppImage")
+source=(
+    "droidproxy.desktop::$url/raw/main/src/packaging/droidproxy.desktop"
+)
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+sha256sums=('SKIP')
+
+package() {
+    local arch_suffix
+    case "$CARCH" in
+        x86_64) arch_suffix="x86_64" ;;
+        aarch64) arch_suffix="aarch64" ;;
+        *) echo "Unsupported arch: $CARCH" >&2; exit 1 ;;
+    esac
+    install -Dm755 "DroidProxyLinux-${arch_suffix}.AppImage" \
+        "$pkgdir/opt/droidproxy/droidproxy.AppImage"
+    install -d "$pkgdir/usr/bin"
+    ln -s "/opt/droidproxy/droidproxy.AppImage" "$pkgdir/usr/bin/${_realname}"
+
+    install -Dm644 droidproxy.desktop \
+        "$pkgdir/usr/share/applications/droidproxy.desktop"
+}

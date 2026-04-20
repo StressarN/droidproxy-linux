@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>DroidProxy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/logo.png" />
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <img src="/logo.png" alt="" />
+            <div>
+                <h1>DroidProxy</h1>
+                <p class="subtitle">Factory Droid proxy for Claude Code, Codex, and Gemini</p>
+            </div>
+        </div>
+        <div class="status-block">
+            <span id="statusDot" class="dot dot-off"></span>
+            <div>
+                <span id="statusText">Stopped</span>
+                <code id="proxyUrl" class="muted"></code>
+            </div>
+            <button id="btnCopyUrl" class="btn ghost">Copy URL</button>
+            <button id="btnToggleServer" class="btn primary">Start</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="card" id="accountsSection">
+            <h2>Accounts</h2>
+            <p class="muted">
+                One-click OAuth for each subscription. Auth tokens are stored in
+                <code>~/.cli-proxy-api/</code> by the bundled Go binary.
+            </p>
+            <div class="services">
+                <article class="service" data-service="claude">
+                    <header>
+                        <h3>Claude Code</h3>
+                        <div>
+                            <label class="switch">
+                                <input type="checkbox" data-provider-toggle="claude" />
+                                <span></span>
+                            </label>
+                            <button class="btn primary" data-action="connect" data-service="claude">
+                                Connect
+                            </button>
+                        </div>
+                    </header>
+                    <ul class="accounts" data-account-list="claude"></ul>
+                    <div class="effort-grid">
+                        <label>
+                            Opus 4.7 effort
+                            <select data-pref="opus47_thinking_effort"></select>
+                        </label>
+                        <label>
+                            Sonnet 4.6 effort
+                            <select data-pref="sonnet46_thinking_effort"></select>
+                        </label>
+                    </div>
+                    <label class="inline danger">
+                        <input type="checkbox" data-pref="claude_max_budget_mode" />
+                        Max Budget Mode (Sonnet 4.6 only)
+                    </label>
+                    <p class="muted small danger" id="maxBudgetWarning" hidden>
+                        Sonnet 4.6 will use classic extended thinking with budget_tokens=63999,
+                        max_tokens=64000, and effort=max. Opus 4.7 keeps its slider.
+                    </p>
+                </article>
+
+                <article class="service" data-service="codex">
+                    <header>
+                        <h3>Codex (OpenAI)</h3>
+                        <div>
+                            <label class="switch">
+                                <input type="checkbox" data-provider-toggle="codex" />
+                                <span></span>
+                            </label>
+                            <button class="btn primary" data-action="connect" data-service="codex">
+                                Connect
+                            </button>
+                        </div>
+                    </header>
+                    <ul class="accounts" data-account-list="codex"></ul>
+                    <div class="effort-grid">
+                        <label>
+                            GPT 5.3 Codex
+                            <select data-pref="gpt53_codex_reasoning_effort"></select>
+                        </label>
+                        <label>
+                            GPT 5.4
+                            <select data-pref="gpt54_reasoning_effort"></select>
+                        </label>
+                    </div>
+                    <label class="inline">
+                        <input type="checkbox" data-pref="gpt53_codex_fast_mode" />
+                        GPT 5.3 Codex fast mode (service_tier=priority on /v1/responses)
+                    </label>
+                    <label class="inline">
+                        <input type="checkbox" data-pref="gpt54_fast_mode" />
+                        GPT 5.4 fast mode
+                    </label>
+                </article>
+
+                <article class="service" data-service="gemini">
+                    <header>
+                        <h3>Gemini (Google)</h3>
+                        <div>
+                            <label class="switch">
+                                <input type="checkbox" data-provider-toggle="gemini" />
+                                <span></span>
+                            </label>
+                            <button class="btn primary" data-action="connect" data-service="gemini">
+                                Connect
+                            </button>
+                        </div>
+                    </header>
+                    <ul class="accounts" data-account-list="gemini"></ul>
+                    <div class="effort-grid">
+                        <label>
+                            Gemini 3.1 Pro level
+                            <select data-pref="gemini31_pro_thinking_level"></select>
+                        </label>
+                        <label>
+                            Gemini 3 Flash level
+                            <select data-pref="gemini3_flash_thinking_level"></select>
+                        </label>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Remote Management</h2>
+            <p class="muted">
+                Control whether the cli-proxy-api-plus admin API is reachable from other
+                hosts. Always keep a secret key set when enabling remote access.
+            </p>
+            <label class="inline">
+                <input type="checkbox" data-pref="allow_remote" />
+                Allow remote access
+            </label>
+            <label class="block">
+                Secret key
+                <input type="password" data-pref="secret_key" placeholder="disabled when empty" />
+            </label>
+        </section>
+
+        <section class="card">
+            <h2>Cloudflare tunnel</h2>
+            <p class="muted">
+                Expose port 8317 via <code>cloudflared tunnel --url</code>. Requires
+                <code>cloudflared</code> on your PATH.
+            </p>
+            <div class="inline-row">
+                <button id="btnTunnelStart" class="btn">Start tunnel</button>
+                <button id="btnTunnelStop" class="btn ghost">Stop tunnel</button>
+                <code id="tunnelUrl" class="muted">no tunnel</code>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Factory integration</h2>
+            <p class="muted">
+                Wire DroidProxy into Factory. The custom models entry edits
+                <code>~/.factory/settings.json</code>; the Challenger Droids are
+                copied into <code>~/.factory/droids/</code> and
+                <code>~/.factory/commands/</code>.
+            </p>
+            <div class="inline-row">
+                <button id="btnApplyFactoryModels" class="btn primary">Apply custom models</button>
+                <span id="factoryModelsStatus" class="muted small"></span>
+            </div>
+            <div class="inline-row">
+                <button id="btnInstallDroids" class="btn">Install Challenger Droids</button>
+                <span id="droidsInstallResult" class="muted small"></span>
+            </div>
+            <p class="muted small">
+                After applying, restart Factory (or open a new session) so the
+                model picker picks up the new entries.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Appearance</h2>
+            <label class="inline">
+                <input type="checkbox" data-pref="oled_theme" />
+                OLED theme (pure-black background)
+            </label>
+        </section>
+
+        <section class="card">
+            <h2>Server logs</h2>
+            <pre id="logTail"></pre>
+        </section>
+    </main>
+
+    <footer>
+        <span>DroidProxy Linux</span>
+        <span>License: MIT</span>
+        <span>© 2026</span>
+    </footer>
+
+    <script src="/app.js"></script>
+</body>
+</html>

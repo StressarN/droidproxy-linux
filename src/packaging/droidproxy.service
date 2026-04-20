@@ -1,0 +1,15 @@
+[Unit]
+Description=DroidProxy headless proxy for Factory Droid CLI
+Documentation=https://github.com/anand-92/droidproxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/droidproxy daemon
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

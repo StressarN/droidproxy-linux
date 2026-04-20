@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=DroidProxy
+GenericName=Factory Droid Proxy
+Comment=Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI
+Exec=droidproxy
+Icon=droidproxy
+Categories=Development;Utility;Network;
+StartupNotify=false
+Terminal=false
+StartupWMClass=droidproxy
+Keywords=claude;codex;gemini;factory;droid;proxy;ai;

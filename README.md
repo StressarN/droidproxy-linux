@@ -1,120 +1,163 @@
-# DroidProxy
+# DroidProxy Linux
 
-<p align="center">
-  <img src="logo.png" alt="DroidProxy" width="128">
-</p>
+A Linux port of [DroidProxy](https://github.com/anand-92/droidproxy) -- the
+native macOS menu bar app that proxies Claude Code, Codex, and Gemini
+subscriptions for Factory Droid. Built on
+[CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus).
 
-A native macOS menu bar app that proxies Claude Code, Codex, and Gemini authentication for use with AI coding tools like [<img src="factory-logo.svg" alt="Factory.ai" height="16">](https://app.factory.ai) Droids. Built on [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus).
+## What you get
 
-## Download
+A Python daemon that spawns `cli-proxy-api-plus` on `127.0.0.1:8318` and a
+thinking/reasoning proxy on `127.0.0.1:8317`. A GTK tray icon
+(AyatanaAppIndicator3) stays in the system tray and a local web UI on
+`http://127.0.0.1:8316` exposes settings, account management, and live
+logs. Byte-stable JSON injection preserves Anthropic prompt caching.
 
-Grab the latest release from [Releases](https://github.com/anand-92/droidproxy/releases/latest):
+Parity with the macOS app:
 
-- **DroidProxy-arm64.dmg** -- Apple Silicon
-- **DroidProxy-arm64.zip** -- ZIP alternative
-
-All releases are code-signed and notarized by Apple. Existing installs auto-update via Sparkle.
-
-## Features
-
-- **One-click OAuth auth** -- Claude Code, Codex, and Gemini login from the menu bar, credential monitoring, auto-refresh
-- **Adaptive thinking proxy** -- Injects `thinking: {"type":"adaptive"}` and per-model `output_config.effort` for Claude Opus 4.7 and Claude Sonnet 4.6 requests sent through `http://localhost:8317`
-- **Codex reasoning controls** -- Injects `reasoning: {"effort":"..."}` for `gpt-5.3-codex` and `gpt-5.4` via the OpenAI-compatible `http://localhost:8317/v1` endpoint
-- **Gemini thinking levels** -- Injects per-model thinking levels for `gemini-3.1-pro-preview` (`low` / `medium` / `high`) and `gemini-3-flash-preview` (`minimal` / `low` / `medium` / `high`) via model name suffix rewriting
-- **Per-model effort controls** -- Configure Opus 4.7 (`low` / `medium` / `high` / `xhigh` / `max`), Sonnet 4.6 (`low` / `medium` / `high` / `max`), GPT 5.3 Codex (`low` / `medium` / `high` / `xhigh`), GPT 5.4 (`low` / `medium` / `high` / `xhigh`), Gemini 3.1 Pro (`low` / `medium` / `high`), and Gemini 3 Flash (`minimal` / `low` / `medium` / `high`) directly from the Settings window
-- **Max Budget Mode** -- Nuclear launch button that forces maximum reasoning on Sonnet 4.6 requests: classic extended thinking with `budget_tokens: 63999`, `max_tokens: 64000`, and `effort: max`. Opus 4.7 is unaffected and continues to use its configured thinking effort slider. Full thinking power for Sonnet, your quota's problem.
-
-<p align="center">
-  <img src="max-mode.png" alt="Max Budget Mode" width="420">
-</p>
-
-- **Sparkle auto-updates** -- Checks daily, installs in the background
-- **Factory integration** -- Use Claude models against `http://localhost:8317`, Codex/OpenAI models against `http://localhost:8317/v1`, and Gemini models against `http://localhost:8317/v1`
-
-## Setup
-
-See [SETUP.md](SETUP.md) for authentication and Factory configuration instructions.
-
-<p align="center">
-  <img src="settings-screenshot.png" alt="DroidProxy Settings" width="420">
-</p>
+- OAuth authentication for Claude, Codex, and Gemini, with auto-refresh.
+- Claude adaptive thinking (`thinking: {"type":"adaptive"}`) plus per-model
+  `output_config.effort` for Opus 4.7 and Sonnet 4.6.
+- Codex reasoning effort (`reasoning: {"effort":"..."}`) for `gpt-5.3-codex`
+  and `gpt-5.4`.
+- Gemini thinking levels for `gemini-3.1-pro-preview` and
+  `gemini-3-flash-preview`.
+- Max Budget Mode for Sonnet 4.6 (classic extended thinking with
+  `budget_tokens: 63999`, `max_tokens: 64000`, `effort: max`). Opus 4.7 is
+  unaffected.
+- Fast mode `service_tier: priority` on `/v1/responses` for GPT 5.4 and
+  GPT 5.3 Codex.
+- Amp CLI management passthrough to `https://ampcode.com` with Location
+  and cookie-domain rewrites.
+- Cloudflared tunnel integration (requires the `cloudflared` binary on the
+  host).
+- Challenger Droid + slash-command install helper for Factory.
 
 ## Requirements
 
-- macOS 13.0+ (Ventura or later)
-- Apple Silicon (M1/M2/M3/M4)
+- Linux (x86_64 or aarch64)
+- Python 3.11+
+- GTK 3 + AyatanaAppIndicator3 runtime (optional; only needed for the tray)
+- `xdg-open` for launching the browser during OAuth
 
-## Build from source
-
-```bash
-# Debug build
-make build
-
-# Release build + signed .app bundle
-./create-app-bundle.sh
-```
-
-## Project Structure
-
-```
-src/
-├── Sources/
-│   ├── main.swift              # App entry point
-│   ├── AppDelegate.swift       # Menu bar & window management
-│   ├── ServerManager.swift     # Server process control & auth
-│   ├── SettingsView.swift      # Main UI
-│   ├── AuthStatus.swift        # Auth file monitoring
-│   ├── ThinkingProxy.swift     # Thinking parameter injection proxy
-│   ├── TunnelManager.swift     # Network tunnel management
-│   ├── IconCatalog.swift       # Icon loading & caching
-│   ├── NotificationNames.swift # Notification constants
-│   └── Resources/
-│       ├── cli-proxy-api-plus  # CLIProxyAPIPlus binary
-│       ├── config.yaml         # Server config
-│       ├── AppIcon.icns        # App icon
-│       ├── icon-active.png     # Menu bar icon (active)
-│       ├── icon-inactive.png   # Menu bar icon (inactive)
-│       ├── icon-claude.png     # Claude service icon
-│       ├── icon-codex.png      # Codex service icon
-│       └── icon-gemini.png     # Gemini service icon
-├── Package.swift
-└── Info.plist
-```
-
-## Challenger Droids
-
-DroidProxy ships with three devil's advocate code reviewer droids -- powered by Claude Opus 4.7, GPT 5.4, and Gemini 3.1 Pro. They challenge your code decisions, surface tradeoffs you may have missed, stress-test edge cases, and suggest concrete alternatives. Running multiple gives you a cross-model second opinion that catches blind spots a single reviewer might miss.
-
-### Install
-
-Copy the droid and command definitions into your personal Factory config:
+On Arch Linux / Omarchy:
 
 ```bash
-mkdir -p ~/.factory/droids ~/.factory/commands
-
-# Droids
-cp .factory/droids/challenger-opus.md ~/.factory/droids/
-cp .factory/droids/challenger-gpt.md ~/.factory/droids/
-cp .factory/droids/challenger-gemini.md ~/.factory/droids/
-
-# Slash commands
-cp .factory/commands/challenge-opus.md ~/.factory/commands/
-cp .factory/commands/challenge-gpt.md ~/.factory/commands/
-cp .factory/commands/challenge-gemini.md ~/.factory/commands/
+sudo pacman -S python python-gobject gtk3 libayatana-appindicator xdg-utils
 ```
 
-### Usage
+On Debian / Ubuntu:
 
-In any Droid session, use the slash commands:
+```bash
+sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 xdg-utils
+```
 
-- `/challenge-opus` -- summon the Claude Opus 4.7 challenger
-- `/challenge-gpt` -- summon the GPT 5.4 challenger
-- `/challenge-gemini` -- summon the Gemini 3.1 Pro challenger
+On Fedora:
 
-Both droids are read-only (no file edits) and return a structured verdict with challenges, edge cases, and acknowledgements of what's solid.
+```bash
+sudo dnf install python3-gobject gtk3 libayatana-appindicator3 xdg-utils
+```
 
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/anand-92/droidproxy.svg?variant=dark)](https://starchart.cc/anand-92/droidproxy)
+## Install
+
+### AppImage (recommended)
+
+Download the AppImage for your architecture from the
+[releases page](https://github.com/anand-92/droidproxy/releases/latest):
+
+```bash
+chmod +x DroidProxyLinux-x86_64.AppImage
+./DroidProxyLinux-x86_64.AppImage
+```
+
+The AppImage ships with its own Python runtime and all GTK bindings, so no
+system packages are required. In-place updates work via
+[AppImageUpdate](https://github.com/AppImage/AppImageUpdate).
+
+### pipx
+
+```bash
+pipx install droidproxy
+droidproxy
+```
+
+Install the `tray` extra if you want the AppIndicator integration:
+
+```bash
+pipx install 'droidproxy[tray]'
+```
+
+### Arch (AUR)
+
+Two packages will be published:
+
+- `droidproxy-bin` -- uses the AppImage (recommended for most users)
+- `droidproxy` -- source build against system Python / GTK
+
+```bash
+paru -S droidproxy-bin     # or: droidproxy
+```
+
+### Source checkout
+
+```bash
+git clone https://github.com/anand-92/droidproxy.git
+cd droidproxy/src
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[tray,dev]'
+```
+
+## Usage
+
+```bash
+droidproxy                # Start tray + daemon + web UI (default)
+droidproxy daemon         # Headless (no tray)
+droidproxy doctor         # Health check for paths, GTK, cloudflared
+droidproxy install-droids # Copy Challenger Droid configs into ~/.factory/
+droidproxy install-binary # (Re)download the cli-proxy-api-plus backend
+droidproxy check-update   # Compare installed vs latest release
+droidproxy paths          # Print the XDG dirs DroidProxy uses
+```
+
+- Settings UI: <http://127.0.0.1:8316/>
+- Thinking proxy: <http://127.0.0.1:8317/> (point Factory here)
+- Backend dashboard: <http://127.0.0.1:8318/management.html>
+
+See [`SETUP.md`](SETUP.md) for the Factory custom-models JSON.
+
+## Running as a user service
+
+Copy the systemd unit:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp src/packaging/droidproxy.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now droidproxy.service
+journalctl --user -u droidproxy.service -f
+```
+
+## Troubleshooting
+
+- **Tray icon missing on GNOME** -- install the AppIndicator extension (or
+  switch to the `droidproxy daemon` mode plus the web UI).
+- **Port 8317 or 8318 already in use** -- override with
+  `droidproxy --proxy-port 18317 --upstream-port 18318`. Update
+  `~/.factory/settings.json` to match.
+- **OAuth browser did not open** -- `xdg-open` could not find a handler.
+  Copy the auth URL out of the web UI log tail and open it manually.
+- **cloudflared not found** -- install from your package manager or
+  <https://github.com/cloudflare/cloudflared/releases>.
+
+## Development
+
+```bash
+python -m pytest src/tests     # 84 tests covering prefs, injector, proxy,
+                               # backend, auth, web UI, tunnel, updater, tray
+ruff check src/src src/tests   # lint
+```
+
 ## License
 
-MIT
+MIT. See [`LICENSE`](LICENSE).

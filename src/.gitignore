@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+
+# Local scratch
+.xdg/
+AppDir/
+*.AppImage
+*.AppImage.zsync
+
+# Cursor artifacts
+.cursor/

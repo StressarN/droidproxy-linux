@@ -1,0 +1,50 @@
+version: 1
+
+script:
+  - mkdir -p AppDir
+  - python -m pip install --target=AppDir/usr/lib/python3/dist-packages --no-compile ..
+  - mkdir -p AppDir/usr/bin
+  - cp ../src/droidproxy/resources/icon-active.png AppDir/droidproxy.png
+
+AppDir:
+  path: ./AppDir
+
+  app_info:
+    id: io.automaze.droidproxy
+    name: DroidProxy
+    icon: droidproxy
+    version: "1.8.7"
+    exec: usr/bin/python3
+    exec_args: >-
+      -E -s
+      -c "from droidproxy.cli import main; import sys; sys.exit(main())"
+      "$@"
+
+  apt:
+    arch: amd64
+    sources:
+      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ jammy main universe"
+    include:
+      - python3
+      - python3-gi
+      - gir1.2-gtk-3.0
+      - gir1.2-ayatanaappindicator3-0.1
+      - libglib2.0-0
+      - ca-certificates
+      - xdg-utils
+
+  files:
+    include:
+      - /usr/share/icons/hicolor/**/apps/droidproxy.*
+    exclude:
+      - usr/share/man
+      - usr/share/doc
+      - usr/lib/python3/dist-packages/*/tests/**
+      - usr/lib/python3/dist-packages/**/__pycache__/**
+
+AppImage:
+  update-information: "gh-releases-zsync|anand-92|droidproxy|latest|DroidProxyLinux-x86_64.AppImage.zsync"
+  sign-key: None
+  arch: x86_64
+  comp: gzip
+  file_name: DroidProxyLinux-x86_64.AppImage
