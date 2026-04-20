@@ -1,5 +1,5 @@
 # Maintainer: StressarN <martin.gustavsen@kreatell.com>
-pkgname=droidproxy
+pkgname=droidproxy-linux
 pkgver=1.8.8
 pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (Linux port)"
@@ -11,6 +11,7 @@ depends=(
     'python-aiohttp'
     'python-watchdog'
     'python-platformdirs'
+    'python-tomli-w'
     'python-psutil'
     'python-gobject'
     'gtk3'
@@ -22,7 +23,7 @@ optdepends=(
 )
 makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
 provides=('droidproxy')
-conflicts=('droidproxy-bin')
+conflicts=('droidproxy' 'droidproxy-linux-bin')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
