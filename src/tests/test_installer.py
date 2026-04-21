@@ -104,7 +104,7 @@ def test_apply_removes_legacy_and_cc_namespace(fake_home: Path) -> None:
         json.dumps(
             {
                 "customModels": [
-                    {"id": "custom:droidproxy:opus-4-6", "index": 0, "model": "x"},
+                    {"id": "custom:droidproxy:opus-4-7", "index": 0, "model": "x"},
                     {"id": "custom:CC:old-plugin", "index": 1, "model": "x"},
                     {"id": "custom:mine:keep", "index": 2, "model": "x"},
                 ]
@@ -114,10 +114,15 @@ def test_apply_removes_legacy_and_cc_namespace(fake_home: Path) -> None:
     result = install_factory_custom_models(target_home=fake_home)
     settings = _read_settings(fake_home)
     ids = [m["id"] for m in settings["customModels"]]
-    assert "custom:droidproxy:opus-4-6" not in ids
+    # Prior DroidProxy entry gets removed and re-added via current DROID_PROXY_MODELS,
+    # not the stale ``model: "x"`` entry. The CC namespace is scrubbed entirely.
     assert "custom:CC:old-plugin" not in ids
     assert "custom:mine:keep" in ids
-    assert "custom:droidproxy:opus-4-6" in result["removed"]
+    droidproxy_entry = next(
+        m for m in settings["customModels"] if m["id"] == "custom:droidproxy:opus-4-7"
+    )
+    assert droidproxy_entry["model"] == "claude-opus-4-7"
+    assert "custom:droidproxy:opus-4-7" in result["removed"]
     assert "custom:CC:old-plugin" in result["removed"]
 
 

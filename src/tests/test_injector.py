@@ -140,6 +140,68 @@ def test_opus_47_unaffected_by_max_budget_mode() -> None:
     assert "max_tokens" not in outcome.body
 
 
+def test_opus_46_adaptive_injection_default_effort() -> None:
+    body = '{"model":"claude-opus-4-6","messages":[]}'
+    outcome = apply_thinking_injection(body, _prefs(opus46_thinking_effort="max"))
+    assert outcome.kind == "claude_adaptive"
+    assert outcome.body == (
+        '{"model":"claude-opus-4-6","thinking":{"type":"adaptive"},'
+        '"output_config":{"effort":"max"},"stream":true,"messages":[]}'
+    )
+
+
+def test_opus_46_max_budget_mode() -> None:
+    body = '{"model":"claude-opus-4-6","messages":[]}'
+    outcome = apply_thinking_injection(
+        body, _prefs(claude_max_budget_mode=True, opus46_thinking_effort="high")
+    )
+    assert outcome.kind == "claude_max_budget"
+    assert outcome.body == (
+        '{"model":"claude-opus-4-6","max_tokens":64000,'
+        '"thinking":{"type":"enabled","budget_tokens":63999},'
+        '"output_config":{"effort":"max"},"stream":true,"messages":[]}'
+    )
+
+
+def test_opus_45_classic_thinking_default_effort() -> None:
+    body = '{"model":"claude-opus-4-5-20251101","messages":[]}'
+    outcome = apply_thinking_injection(body, _prefs(opus45_thinking_effort="high"))
+    assert outcome.kind == "opus_45_classic"
+    # high -> (32000, 48000)
+    assert outcome.body == (
+        '{"model":"claude-opus-4-5-20251101","max_tokens":48000,'
+        '"thinking":{"type":"enabled","budget_tokens":32000},'
+        '"stream":true,"messages":[]}'
+    )
+
+
+def test_opus_45_classic_thinking_max_effort() -> None:
+    body = '{"model":"claude-opus-4-5","messages":[]}'
+    outcome = apply_thinking_injection(body, _prefs(opus45_thinking_effort="max"))
+    assert outcome.kind == "opus_45_classic"
+    # max -> (48000, 64000)
+    assert '"max_tokens":64000' in outcome.body
+    assert '"thinking":{"type":"enabled","budget_tokens":48000}' in outcome.body
+    # No output_config for classic thinking
+    assert "output_config" not in outcome.body
+
+
+def test_opus_45_does_not_match_opus_4_50() -> None:
+    body = '{"model":"claude-opus-4-50","messages":[]}'
+    outcome = apply_thinking_injection(body, _prefs())
+    # Should not be classified as Opus 4.5 (no false-positive match).
+    assert outcome.kind != "opus_45_classic"
+
+
+def test_opus_45_matches_gemini_claude_alias() -> None:
+    body = '{"model":"gemini-claude-opus-4-5","messages":[]}'
+    outcome = apply_thinking_injection(body, _prefs(opus45_thinking_effort="low"))
+    assert outcome.kind == "opus_45_classic"
+    # low -> (4000, 16000)
+    assert '"max_tokens":16000' in outcome.body
+    assert '"budget_tokens":4000' in outcome.body
+
+
 def test_existing_thinking_is_replaced_not_duplicated() -> None:
     body = '{"model":"claude-opus-4-7","thinking":{"type":"enabled","budget_tokens":1024}}'
     outcome = apply_thinking_injection(body, _prefs(opus47_thinking_effort="max"))

@@ -16,6 +16,8 @@ def store(tmp_path: Path) -> PreferencesStore:
 def test_defaults_match_macos_swift(store: PreferencesStore) -> None:
     snap = store.snapshot()
     assert snap.opus47_thinking_effort == "xhigh"
+    assert snap.opus46_thinking_effort == "max"
+    assert snap.opus45_thinking_effort == "high"
     assert snap.sonnet46_thinking_effort == "high"
     assert snap.gpt53_codex_reasoning_effort == "high"
     assert snap.gpt54_reasoning_effort == "high"

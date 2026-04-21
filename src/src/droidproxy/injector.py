@@ -123,9 +123,38 @@ def _claude_adaptive_thinking_effort(model: str, prefs: Preferences) -> str | No
         return None
     if "opus-4-7" in model:
         return prefs.opus47_thinking_effort
+    if "opus-4-6" in model:
+        return prefs.opus46_thinking_effort
     if "sonnet-4-6" in model:
         return prefs.sonnet46_thinking_effort
     return None
+
+
+def _is_opus_45_model(model: str) -> bool:
+    """Match Opus 4.5 without matching ``opus-4-50`` or ``opus-4-5x`` variants.
+
+    The ``opus-4-5`` token must be at end-of-string or followed by ``-``.
+    """
+    if not (model.startswith("claude-") or model.startswith("gemini-claude-")):
+        return False
+    idx = model.find("opus-4-5")
+    if idx < 0:
+        return False
+    suffix = model[idx + len("opus-4-5"):]
+    return suffix == "" or suffix.startswith("-")
+
+
+def _opus_45_classic_budget(effort: str) -> tuple[int, int]:
+    """Map effort to ``(budget_tokens, max_tokens)`` for Opus 4.5 classic thinking."""
+    if effort == "low":
+        return (4000, 16000)
+    if effort == "medium":
+        return (16000, 32000)
+    if effort == "high":
+        return (32000, 48000)
+    if effort == "max":
+        return (48000, 64000)
+    return (32000, 48000)
 
 
 @dataclass(frozen=True)
@@ -137,6 +166,7 @@ class InjectionOutcome:
         "gemini_thinking",
         "claude_adaptive",
         "claude_max_budget",
+        "opus_45_classic",
     ]
     details: dict[str, str]
 
@@ -187,6 +217,48 @@ def apply_thinking_injection(body: str, prefs: Preferences) -> InjectionOutcome:
             details={"model": model, "level": gemini_level},
         )
 
+    # Opus 4.5 does not accept adaptive thinking; use classic extended thinking
+    # (``thinking: {type: "enabled", budget_tokens: N}`` with ``budget_tokens < max_tokens``).
+    if _is_opus_45_model(model):
+        effort = prefs.opus45_thinking_effort
+        budget_tokens, max_tokens = _opus_45_classic_budget(effort)
+        has_stream_ = "stream" in parsed
+        has_thinking_ = "thinking" in parsed
+        has_max_tokens_ = "max_tokens" in parsed
+
+        new_body = body
+        new_body = replace_or_inject_json_field(
+            new_body,
+            after_key="model",
+            field_name="stream",
+            field_value="true",
+            exists=has_stream_,
+        )
+        new_body = replace_or_inject_json_field(
+            new_body,
+            after_key="model",
+            field_name="max_tokens",
+            field_value=str(max_tokens),
+            exists=has_max_tokens_,
+        )
+        new_body = replace_or_inject_json_field(
+            new_body,
+            after_key="max_tokens",
+            field_name="thinking",
+            field_value=f'{{"type":"enabled","budget_tokens":{budget_tokens}}}',
+            exists=has_thinking_,
+        )
+        return InjectionOutcome(
+            body=new_body,
+            kind="opus_45_classic",
+            details={
+                "model": model,
+                "effort": effort,
+                "max_tokens": str(max_tokens),
+                "budget_tokens": str(budget_tokens),
+            },
+        )
+
     claude_effort = _claude_adaptive_thinking_effort(model, prefs)
     if claude_effort is None:
         return InjectionOutcome(body=body, kind="none", details={})
@@ -205,7 +277,7 @@ def apply_thinking_injection(body: str, prefs: Preferences) -> InjectionOutcome:
         exists=has_stream,
     )
 
-    if prefs.claude_max_budget_mode and "sonnet-4-6" in model:
+    if prefs.claude_max_budget_mode and ("sonnet-4-6" in model or "opus-4-6" in model):
         max_tokens = 64000
         budget_tokens = max_tokens - 1
         new_body = replace_or_inject_json_field(

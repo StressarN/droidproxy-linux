@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 
 
 OPUS_47_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+OPUS_46_EFFORTS = ("low", "medium", "high", "max")
+OPUS_45_EFFORTS = ("low", "medium", "high", "max")
 SONNET_46_EFFORTS = ("low", "medium", "high", "max")
 GPT_53_CODEX_EFFORTS = ("low", "medium", "high", "xhigh")
 GPT_54_EFFORTS = ("low", "medium", "high", "xhigh")
@@ -34,6 +36,8 @@ GEMINI_3_FLASH_LEVELS = ("minimal", "low", "medium", "high")
 @dataclass
 class Preferences:
     opus47_thinking_effort: str = "xhigh"
+    opus46_thinking_effort: str = "max"
+    opus45_thinking_effort: str = "high"
     sonnet46_thinking_effort: str = "high"
     gpt53_codex_reasoning_effort: str = "high"
     gpt54_reasoning_effort: str = "high"
@@ -52,6 +56,8 @@ class Preferences:
 
 _VALID = {
     "opus47_thinking_effort": OPUS_47_EFFORTS,
+    "opus46_thinking_effort": OPUS_46_EFFORTS,
+    "opus45_thinking_effort": OPUS_45_EFFORTS,
     "sonnet46_thinking_effort": SONNET_46_EFFORTS,
     "gpt53_codex_reasoning_effort": GPT_53_CODEX_EFFORTS,
     "gpt54_reasoning_effort": GPT_54_EFFORTS,

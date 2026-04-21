@@ -55,17 +55,26 @@
                             <select data-pref="opus47_thinking_effort"></select>
                         </label>
                         <label>
+                            Opus 4.6 effort
+                            <select data-pref="opus46_thinking_effort"></select>
+                        </label>
+                        <label>
+                            Opus 4.5 effort
+                            <select data-pref="opus45_thinking_effort"></select>
+                        </label>
+                        <label>
                             Sonnet 4.6 effort
                             <select data-pref="sonnet46_thinking_effort"></select>
                         </label>
                     </div>
                     <label class="inline danger">
                         <input type="checkbox" data-pref="claude_max_budget_mode" />
-                        Max Budget Mode (Sonnet 4.6 only)
+                        Max Budget Mode (Opus 4.6 + Sonnet 4.6)
                     </label>
                     <p class="muted small danger" id="maxBudgetWarning" hidden>
-                        Sonnet 4.6 will use classic extended thinking with budget_tokens=63999,
-                        max_tokens=64000, and effort=max. Opus 4.7 keeps its slider.
+                        Opus 4.6 and Sonnet 4.6 will use classic extended thinking with
+                        budget_tokens=63999, max_tokens=64000, and effort=max. Opus 4.7
+                        keeps its slider.
                     </p>
                 </article>
 

@@ -35,6 +35,26 @@ DROID_PROXY_MODELS: list[dict[str, Any]] = [
         "provider": "anthropic",
     },
     {
+        "model": "claude-opus-4-6",
+        "id": "custom:droidproxy:opus-4-6",
+        "baseUrl": "http://localhost:8317",
+        "apiKey": "dummy-not-used",
+        "displayName": "DroidProxy: Opus 4.6",
+        "maxOutputTokens": 128000,
+        "noImageSupport": False,
+        "provider": "anthropic",
+    },
+    {
+        "model": "claude-opus-4-5-20251101",
+        "id": "custom:droidproxy:opus-4-5",
+        "baseUrl": "http://localhost:8317",
+        "apiKey": "dummy-not-used",
+        "displayName": "DroidProxy: Opus 4.5",
+        "maxOutputTokens": 64000,
+        "noImageSupport": False,
+        "provider": "anthropic",
+    },
+    {
         "model": "claude-sonnet-4-6",
         "id": "custom:droidproxy:sonnet-4-6",
         "baseUrl": "http://localhost:8317",
@@ -87,9 +107,9 @@ DROID_PROXY_MODELS: list[dict[str, Any]] = [
 ]
 
 # IDs from previous DroidProxy releases that should be scrubbed during Apply
-# so users don't end up with stale entries (e.g. Opus 4.6) next to the current
-# ones. Matches ``legacyDroidProxyModelIds`` in the Swift app.
-LEGACY_DROIDPROXY_MODEL_IDS: frozenset[str] = frozenset({"custom:droidproxy:opus-4-6"})
+# so users don't end up with stale entries next to the current ones.
+# Matches ``legacyDroidProxyModelIds`` in the Swift app.
+LEGACY_DROIDPROXY_MODEL_IDS: frozenset[str] = frozenset()
 
 
 def install_challenger_droids(target_home: Path | None = None) -> dict[str, list[str]]:

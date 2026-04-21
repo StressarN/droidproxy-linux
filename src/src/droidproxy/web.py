@@ -354,6 +354,8 @@ class WebUI:
             },
             "effort_options": {
                 "opus47_thinking_effort": list(_EFFORT_OPTIONS["opus47_thinking_effort"]),
+                "opus46_thinking_effort": list(_EFFORT_OPTIONS["opus46_thinking_effort"]),
+                "opus45_thinking_effort": list(_EFFORT_OPTIONS["opus45_thinking_effort"]),
                 "sonnet46_thinking_effort": list(_EFFORT_OPTIONS["sonnet46_thinking_effort"]),
                 "gpt53_codex_reasoning_effort": list(
                     _EFFORT_OPTIONS["gpt53_codex_reasoning_effort"]
@@ -371,6 +373,8 @@ class WebUI:
 
 _EFFORT_OPTIONS = {
     "opus47_thinking_effort": ("low", "medium", "high", "xhigh", "max"),
+    "opus46_thinking_effort": ("low", "medium", "high", "max"),
+    "opus45_thinking_effort": ("low", "medium", "high", "max"),
     "sonnet46_thinking_effort": ("low", "medium", "high", "max"),
     "gpt53_codex_reasoning_effort": ("low", "medium", "high", "xhigh"),
     "gpt54_reasoning_effort": ("low", "medium", "high", "xhigh"),
