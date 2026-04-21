@@ -54,13 +54,20 @@
         });
 
         // Provider toggles.
-        for (const name of ["claude", "codex", "gemini"]) {
+        for (const name of [
+            "claude",
+            "codex",
+            "gemini",
+            "synthetic",
+            "kimi",
+            "fireworks",
+        ]) {
             const toggle = document.querySelector(`[data-provider-toggle="${name}"]`);
             if (toggle) {
                 toggle.checked =
                     state.prefs.enabled_providers == null
                         ? true
-                        : !!state.prefs.enabled_providers[name];
+                        : state.prefs.enabled_providers[name] !== false;
             }
         }
 

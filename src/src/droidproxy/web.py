@@ -308,18 +308,21 @@ class WebUI:
 
     async def _factory_models_status(self, request: web.Request) -> web.Response:
         from droidproxy.installer import (
-            DROID_PROXY_MODELS,
+            ALL_DROID_PROXY_MODELS,
             factory_custom_models_installed,
             factory_settings_path,
         )
 
         prefs = self._ctx.prefs.snapshot()
-        installed = factory_custom_models_installed(prefs.enabled_providers)
+        installed = factory_custom_models_installed(
+            prefs.enabled_providers,
+            api_keys=_direct_api_keys(prefs),
+        )
         return web.json_response(
             {
                 "installed": installed,
                 "settings_path": str(factory_settings_path()),
-                "model_ids": [m["id"] for m in DROID_PROXY_MODELS],
+                "model_ids": [m["id"] for m in ALL_DROID_PROXY_MODELS],
             }
         )
 
@@ -328,7 +331,10 @@ class WebUI:
 
         prefs = self._ctx.prefs.snapshot()
         try:
-            result = install_factory_custom_models(prefs.enabled_providers)
+            result = install_factory_custom_models(
+                prefs.enabled_providers,
+                api_keys=_direct_api_keys(prefs),
+            )
         except OSError as err:
             raise web.HTTPInternalServerError(reason=str(err)) from err
         return web.json_response(result)
@@ -349,7 +355,10 @@ class WebUI:
             "prefs": prefs,
             "accounts": self._ctx.auth_manager.snapshot(),
             "factory": {
-                "models_installed": factory_custom_models_installed(snap.enabled_providers),
+                "models_installed": factory_custom_models_installed(
+                    snap.enabled_providers,
+                    api_keys=_direct_api_keys(snap),
+                ),
                 "settings_path": str(factory_settings_path()),
             },
             "effort_options": {
@@ -384,3 +393,12 @@ _EFFORT_OPTIONS = {
 
 
 SERVICE_ORDER = [ServiceType.CLAUDE, ServiceType.CODEX, ServiceType.GEMINI]
+
+
+def _direct_api_keys(prefs: Any) -> dict[str, str]:
+    """Extract direct-API credentials for the Synthetic/Kimi/Fireworks bridges."""
+    return {
+        "synthetic": getattr(prefs, "synthetic_api_key", "") or "",
+        "kimi": getattr(prefs, "kimi_api_key", "") or "",
+        "fireworks": getattr(prefs, "fireworks_api_key", "") or "",
+    }

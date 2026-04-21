@@ -10,6 +10,16 @@ Two public helpers:
   in ``SettingsView.applyFactoryCustomModels()``. It removes any stale
   DroidProxy entries (including legacy IDs like ``opus-4-6`` and the
   ``custom:CC:*`` namespace) before re-appending the current set.
+
+The Factory ``customModels`` list covers two classes of models:
+
+1. **OAuth-via-CLIProxyAPIPlus** (``claude``, ``codex``, ``gemini``) -- these
+   point at ``http://localhost:8317`` / ``/v1`` so they hit the ThinkingProxy
+   and inherit the injected thinking/reasoning params. ``apiKey`` is
+   ``dummy-not-used``.
+2. **Direct API** (``synthetic``, ``kimi``, ``fireworks``) -- these point
+   straight at the vendor endpoint. ``apiKey`` is substituted from the
+   matching preference. Empty key = model is skipped.
 """
 
 from __future__ import annotations
@@ -106,6 +116,118 @@ DROID_PROXY_MODELS: list[dict[str, Any]] = [
     },
 ]
 
+# Synthetic (https://dev.synthetic.new) -- OpenAI-compatible endpoint, curated
+# subset of the always-on catalogue focused on agentic-coding-capable models.
+SYNTHETIC_MODELS: list[dict[str, Any]] = [
+    {
+        "model": "hf:moonshotai/Kimi-K2.5",
+        "id": "custom:droidproxy:synthetic-kimi-k2-5",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic Kimi K2.5",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+    {
+        "model": "hf:moonshotai/Kimi-K2-Thinking",
+        "id": "custom:droidproxy:synthetic-kimi-thinking",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic Kimi K2 Thinking",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+    {
+        "model": "hf:zai-org/GLM-4.7",
+        "id": "custom:droidproxy:synthetic-glm-4-7",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic GLM 4.7",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+    {
+        "model": "hf:Qwen/Qwen3-Coder-480B-A35B-Instruct",
+        "id": "custom:droidproxy:synthetic-qwen3-coder",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic Qwen3 Coder 480B",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+    {
+        "model": "hf:deepseek-ai/DeepSeek-V3.2",
+        "id": "custom:droidproxy:synthetic-deepseek-v3-2",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic DeepSeek V3.2",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+    {
+        "model": "hf:MiniMaxAI/MiniMax-M2.5",
+        "id": "custom:droidproxy:synthetic-minimax-m2-5",
+        "baseUrl": "https://api.synthetic.new/openai/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Synthetic MiniMax M2.5",
+        "maxOutputTokens": 128000,
+        "noImageSupport": True,
+        "provider": "openai",
+        "_provider_key": "synthetic",
+    },
+]
+
+# Kimi Code (Moonshot AI) -- Anthropic-compatible endpoint for the official
+# Kimi Code offering described at kimi.com/code.
+KIMI_CODE_MODELS: list[dict[str, Any]] = [
+    {
+        "model": "kimi-for-coding",
+        "id": "custom:droidproxy:kimi-code",
+        "baseUrl": "https://api.kimi.com/coding",
+        "apiKey": "",
+        "displayName": "DroidProxy: Kimi Code (K2.6)",
+        "maxOutputTokens": 32768,
+        "noImageSupport": True,
+        "provider": "anthropic",
+        "_provider_key": "kimi",
+    },
+]
+
+# Fireworks Fire Pass -- OpenAI-compatible router that zeroes out billing for
+# Kimi K2.5 Turbo while a pass is active. Only this one router ID is covered.
+FIREWORKS_MODELS: list[dict[str, Any]] = [
+    {
+        "model": "accounts/fireworks/routers/kimi-k2p5-turbo",
+        "id": "custom:droidproxy:fireworks-kimi-k2p5-turbo",
+        "baseUrl": "https://api.fireworks.ai/inference/v1",
+        "apiKey": "",
+        "displayName": "DroidProxy: Fireworks Kimi K2.5 Turbo (Fire Pass)",
+        "maxOutputTokens": 256000,
+        "noImageSupport": False,
+        "provider": "openai",
+        "_provider_key": "fireworks",
+    },
+]
+
+# Every DroidProxy-managed model. Order determines apply order in
+# ``settings.json`` (OAuth-routed first, then direct-API services).
+ALL_DROID_PROXY_MODELS: list[dict[str, Any]] = [
+    *DROID_PROXY_MODELS,
+    *SYNTHETIC_MODELS,
+    *KIMI_CODE_MODELS,
+    *FIREWORKS_MODELS,
+]
+
 # IDs from previous DroidProxy releases that should be scrubbed during Apply
 # so users don't end up with stale entries next to the current ones.
 # Matches ``legacyDroidProxyModelIds`` in the Swift app.
@@ -144,8 +266,25 @@ def install_challenger_droids(target_home: Path | None = None) -> dict[str, list
     }
 
 
+_DEFAULT_PROVIDERS: dict[str, bool] = {
+    "claude": True,
+    "codex": True,
+    "gemini": True,
+    "synthetic": True,
+    "kimi": True,
+    "fireworks": True,
+}
+
+
 def _provider_key_for(model: dict[str, Any]) -> str | None:
-    """Return the DroidProxy provider key (``claude``/``codex``/``gemini``) for a model entry."""
+    """Return the DroidProxy provider key for a model entry.
+
+    Direct-API services carry an explicit ``_provider_key`` marker; the OAuth
+    models are detected by their ``model`` field prefix.
+    """
+    marker = model.get("_provider_key")
+    if isinstance(marker, str):
+        return marker
     name = model.get("model")
     if not isinstance(name, str):
         return None
@@ -163,11 +302,42 @@ def factory_settings_path(target_home: Path | None = None) -> Path:
     return home / ".factory" / "settings.json"
 
 
-def _enabled_model_ids(enabled_providers: dict[str, bool]) -> set[str]:
+def _resolve_api_keys(
+    api_keys: dict[str, str] | None,
+) -> dict[str, str]:
+    resolved = {"synthetic": "", "kimi": "", "fireworks": ""}
+    if api_keys:
+        for k, v in api_keys.items():
+            if k in resolved and isinstance(v, str):
+                resolved[k] = v
+    return resolved
+
+
+def _model_available(
+    model: dict[str, Any],
+    providers: dict[str, bool],
+    api_keys: dict[str, str],
+) -> bool:
+    """True when the model should be exposed to Factory right now."""
+    key = _provider_key_for(model)
+    if key is None:
+        return True
+    if not providers.get(key, True):
+        return False
+    if key in api_keys and not api_keys[key]:
+        # Direct-API services need a key; empty key = skip this pass.
+        return False
+    return True
+
+
+def _enabled_model_ids(
+    enabled_providers: dict[str, bool],
+    api_keys: dict[str, str] | None = None,
+) -> set[str]:
+    keys = _resolve_api_keys(api_keys)
     result: set[str] = set()
-    for model in DROID_PROXY_MODELS:
-        key = _provider_key_for(model)
-        if key is not None and not enabled_providers.get(key, True):
+    for model in ALL_DROID_PROXY_MODELS:
+        if not _model_available(model, enabled_providers, keys):
             continue
         mid = model.get("id")
         if isinstance(mid, str):
@@ -179,6 +349,7 @@ def factory_custom_models_installed(
     enabled_providers: dict[str, bool],
     *,
     target_home: Path | None = None,
+    api_keys: dict[str, str] | None = None,
 ) -> bool:
     """True when every currently enabled DroidProxy model ID is already in ``settings.json``."""
     path = factory_settings_path(target_home)
@@ -194,7 +365,7 @@ def factory_custom_models_installed(
     if not isinstance(models, list):
         return False
     existing = {m.get("id") for m in models if isinstance(m, dict)}
-    expected = _enabled_model_ids(enabled_providers)
+    expected = _enabled_model_ids(enabled_providers, api_keys)
     return bool(expected) and expected.issubset(existing)
 
 
@@ -202,6 +373,7 @@ def install_factory_custom_models(
     enabled_providers: dict[str, bool] | None = None,
     *,
     target_home: Path | None = None,
+    api_keys: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Merge DroidProxy models into ``~/.factory/settings.json`` atomically.
 
@@ -209,11 +381,18 @@ def install_factory_custom_models(
     * Strips prior DroidProxy entries (current IDs, legacy IDs, and the
       ``custom:CC:*`` namespace) before re-appending.
     * Skips models whose provider has been disabled in the DroidProxy UI.
+    * Skips direct-API models (Synthetic/Kimi/Fireworks) when no API key is set.
     * Creates ``~/.factory/`` when missing.
+
+    ``api_keys`` is ``{"synthetic": ..., "kimi": ..., "fireworks": ...}``; each
+    non-empty key is substituted into the ``apiKey`` field of the matching
+    emitted model entry. OAuth-routed models keep ``dummy-not-used``.
     """
-    providers = {"claude": True, "codex": True, "gemini": True}
+    providers = dict(_DEFAULT_PROVIDERS)
     if enabled_providers:
         providers.update(enabled_providers)
+
+    resolved_keys = _resolve_api_keys(api_keys)
 
     path = factory_settings_path(target_home)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -231,7 +410,7 @@ def install_factory_custom_models(
     if not isinstance(models, list):
         models = []
 
-    current_ids = {m["id"] for m in DROID_PROXY_MODELS}
+    current_ids = {m["id"] for m in ALL_DROID_PROXY_MODELS}
     cleaned: list[dict[str, Any]] = []
     removed_ids: list[str] = []
     for entry in models:
@@ -247,12 +426,15 @@ def install_factory_custom_models(
             continue
         cleaned.append(entry)
 
-    enabled_models = [
-        dict(model)
-        for model in DROID_PROXY_MODELS
-        if (_provider_key_for(model) is None)
-        or providers.get(_provider_key_for(model), True)
-    ]
+    enabled_models: list[dict[str, Any]] = []
+    for model in ALL_DROID_PROXY_MODELS:
+        if not _model_available(model, providers, resolved_keys):
+            continue
+        emitted = {k: v for k, v in model.items() if not k.startswith("_")}
+        key = _provider_key_for(model)
+        if key in resolved_keys and resolved_keys[key]:
+            emitted["apiKey"] = resolved_keys[key]
+        enabled_models.append(emitted)
 
     start_index = len(cleaned)
     for offset, model in enumerate(enabled_models):
@@ -275,7 +457,7 @@ def install_factory_custom_models(
     installed_ids = [m["id"] for m in enabled_models]
     skipped_ids = [
         m["id"]
-        for m in DROID_PROXY_MODELS
+        for m in ALL_DROID_PROXY_MODELS
         if m["id"] not in installed_ids
     ]
     return {

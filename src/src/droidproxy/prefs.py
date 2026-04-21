@@ -49,8 +49,21 @@ class Preferences:
     allow_remote: bool = False
     secret_key: str = ""
     oled_theme: bool = False
+    # Direct-API providers: Factory talks to these services directly, bypassing
+    # the ThinkingProxy entirely. Keys are written into Factory's settings.json
+    # only when non-empty.
+    synthetic_api_key: str = ""
+    kimi_api_key: str = ""
+    fireworks_api_key: str = ""
     enabled_providers: dict[str, bool] = field(
-        default_factory=lambda: {"claude": True, "codex": True, "gemini": True}
+        default_factory=lambda: {
+            "claude": True,
+            "codex": True,
+            "gemini": True,
+            "synthetic": True,
+            "kimi": True,
+            "fireworks": True,
+        }
     )
 
 
@@ -119,7 +132,10 @@ class PreferencesStore:
                             default,
                         )
                         continue
-                    merged[key] = coerced
+                    if isinstance(default, dict) and isinstance(coerced, dict):
+                        merged[key] = {**default, **coerced}
+                    else:
+                        merged[key] = coerced
             self._prefs = Preferences(**merged)
 
     def snapshot(self) -> Preferences:
@@ -159,7 +175,14 @@ class PreferencesStore:
 
     def set_provider_enabled(self, provider: str, enabled: bool) -> bool:
         provider = provider.lower()
-        if provider not in {"claude", "codex", "gemini"}:
+        if provider not in {
+            "claude",
+            "codex",
+            "gemini",
+            "synthetic",
+            "kimi",
+            "fireworks",
+        }:
             raise ValueError(f"Unknown provider: {provider}")
         with self._lock:
             providers = dict(self._prefs.enabled_providers)
@@ -173,7 +196,12 @@ class PreferencesStore:
             return bool(self._prefs.enabled_providers.get(provider.lower(), True))
 
     def disabled_providers(self) -> list[str]:
-        """Provider IDs that the user has disabled (matches oauth-excluded keys)."""
+        """OAuth provider IDs that the user has disabled (matches ``oauth-excluded`` keys).
+
+        Only the OAuth-routed providers map here (claude, codex, gemini); the
+        direct-API services (synthetic, kimi, fireworks) don't go through
+        CLIProxyAPIPlus so they have no ``oauth-excluded`` entry.
+        """
         mapping = {"claude": "claude", "codex": "codex", "gemini": "gemini-cli"}
         with self._lock:
             return sorted(

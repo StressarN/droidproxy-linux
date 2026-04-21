@@ -170,6 +170,77 @@
         </section>
 
         <section class="card">
+            <h2>Direct-API providers</h2>
+            <p class="muted">
+                These services bypass the ThinkingProxy entirely; Factory talks
+                straight to the vendor endpoint using the API key you paste
+                below. Models appear in Factory's picker after you hit
+                <em>Apply custom models</em>. Leave a key blank to hide its
+                models from the picker.
+            </p>
+
+            <div class="direct-api-row">
+                <div class="direct-api-head">
+                    <strong>Synthetic</strong>
+                    <label class="switch">
+                        <input type="checkbox" data-provider-toggle="synthetic" />
+                        <span></span>
+                    </label>
+                </div>
+                <p class="muted small">
+                    Flat-rate access to Kimi K2.5, GLM-4.7, Qwen3-Coder, DeepSeek V3.2,
+                    MiniMax M2.5 and more (OpenAI-compatible,
+                    <a href="https://dev.synthetic.new/docs/api/models" target="_blank" rel="noopener">model list</a>).
+                </p>
+                <input
+                    type="password"
+                    data-pref="synthetic_api_key"
+                    placeholder="Synthetic API key (syn_...)"
+                />
+            </div>
+
+            <div class="direct-api-row">
+                <div class="direct-api-head">
+                    <strong>Kimi Code (Moonshot AI)</strong>
+                    <label class="switch">
+                        <input type="checkbox" data-provider-toggle="kimi" />
+                        <span></span>
+                    </label>
+                </div>
+                <p class="muted small">
+                    Official Kimi K2.6 coding model
+                    (<a href="https://www.kimi.com/code" target="_blank" rel="noopener">kimi.com/code</a>,
+                    Anthropic-compatible).
+                </p>
+                <input
+                    type="password"
+                    data-pref="kimi_api_key"
+                    placeholder="Kimi API key (sk-kimi-...)"
+                />
+            </div>
+
+            <div class="direct-api-row">
+                <div class="direct-api-head">
+                    <strong>Fireworks Fire Pass</strong>
+                    <label class="switch">
+                        <input type="checkbox" data-provider-toggle="fireworks" />
+                        <span></span>
+                    </label>
+                </div>
+                <p class="muted small">
+                    $7/week pass for unlimited Kimi K2.5 Turbo via
+                    <a href="https://docs.fireworks.ai/firepass" target="_blank" rel="noopener">
+                        Fireworks Fire Pass</a>. Only the turbo router is covered.
+                </p>
+                <input
+                    type="password"
+                    data-pref="fireworks_api_key"
+                    placeholder="Fireworks API key (fw_...)"
+                />
+            </div>
+        </section>
+
+        <section class="card">
             <h2>Factory integration</h2>
             <p class="muted">
                 Wire DroidProxy into Factory. The custom models entry edits

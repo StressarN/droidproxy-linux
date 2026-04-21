@@ -29,7 +29,17 @@ def test_defaults_match_macos_swift(store: PreferencesStore) -> None:
     assert snap.allow_remote is False
     assert snap.secret_key == ""
     assert snap.oled_theme is False
-    assert snap.enabled_providers == {"claude": True, "codex": True, "gemini": True}
+    assert snap.enabled_providers == {
+        "claude": True,
+        "codex": True,
+        "gemini": True,
+        "synthetic": True,
+        "kimi": True,
+        "fireworks": True,
+    }
+    assert snap.synthetic_api_key == ""
+    assert snap.kimi_api_key == ""
+    assert snap.fireworks_api_key == ""
 
 
 def test_round_trip_persists_to_toml(store: PreferencesStore) -> None:
@@ -88,3 +98,52 @@ def test_malformed_toml_falls_back_to_defaults(tmp_path: Path) -> None:
     path.write_text("this is = not valid = toml\n")
     store = PreferencesStore(path=path)
     assert store.snapshot() == Preferences()
+
+
+def test_legacy_enabled_providers_dict_gets_new_keys_merged(tmp_path: Path) -> None:
+    """An older config.toml with only the OAuth providers must pick up the new
+    direct-API provider keys with their defaults on reload."""
+    path = tmp_path / "config.toml"
+    path.write_text(
+        "[enabled_providers]\n"
+        "claude = true\n"
+        "codex = false\n"
+        "gemini = true\n"
+    )
+    store = PreferencesStore(path=path)
+    providers = store.snapshot().enabled_providers
+    assert providers["claude"] is True
+    assert providers["codex"] is False
+    assert providers["gemini"] is True
+    assert providers["synthetic"] is True
+    assert providers["kimi"] is True
+    assert providers["fireworks"] is True
+
+
+def test_direct_api_provider_toggles(store: PreferencesStore) -> None:
+    store.set_provider_enabled("synthetic", False)
+    store.set_provider_enabled("kimi", False)
+    store.set_provider_enabled("fireworks", False)
+    assert store.is_provider_enabled("synthetic") is False
+    assert store.is_provider_enabled("kimi") is False
+    assert store.is_provider_enabled("fireworks") is False
+    # Direct-API providers don't map to CLIProxyAPIPlus OAuth exclusions.
+    assert store.disabled_providers() == []
+
+
+def test_unknown_provider_rejected(store: PreferencesStore) -> None:
+    with pytest.raises(ValueError):
+        store.set_provider_enabled("bogus", False)
+
+
+def test_direct_api_keys_roundtrip(store: PreferencesStore) -> None:
+    store.update(
+        {
+            "synthetic_api_key": "syn_test123",
+            "kimi_api_key": "sk-kimi-test",
+            "fireworks_api_key": "fw_test",
+        }
+    )
+    assert store.get("synthetic_api_key") == "syn_test123"
+    assert store.get("kimi_api_key") == "sk-kimi-test"
+    assert store.get("fireworks_api_key") == "fw_test"
