@@ -124,7 +124,10 @@ droidproxy paths          # Print the XDG dirs DroidProxy uses
 - Thinking proxy: <http://127.0.0.1:8317/> (point Factory here)
 - Backend dashboard: <http://127.0.0.1:8318/management.html>
 
-See [`SETUP.md`](SETUP.md) for the Factory custom-models JSON.
+## Setup guides
+
+- [`SETUP.md`](SETUP.md) -- use Factory Droid with your subscriptions.
+- [`AMP_SETUP.md`](AMP_SETUP.md) -- route Amp CLI through DroidProxy.
 
 ## Running as a user service
 
