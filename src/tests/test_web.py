@@ -85,6 +85,7 @@ async def test_status_payload_contains_accounts_and_effort_options(
     assert data["server_running"] is False
     assert data["proxy_url"].startswith("http://localhost:")
     assert "opus47_thinking_effort" in data["effort_options"]
+    assert "gpt55_reasoning_effort" in data["effort_options"]
     assert any(acc["display_name"] == "alice@example.com" for acc in data["accounts"]["claude"])
 
 

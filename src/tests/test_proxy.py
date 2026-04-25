@@ -172,7 +172,7 @@ async def test_non_gemini_responses_path_is_preserved(
     proxy_client: tuple[aiohttp.ClientSession, int],
 ) -> None:
     client, port = proxy_client
-    body = b'{"model":"gpt-5.4","input":[]}'
+    body = b'{"model":"gpt-5.5","input":[]}'
     resp = await client.post(
         f"http://127.0.0.1:{port}/v1/responses",
         data=body,

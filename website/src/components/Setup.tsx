@@ -113,12 +113,12 @@ export default function Setup() {
     "provider": "openai"
   },
   {
-    "model": "gpt-5.4",
-    "id": "custom:droidproxy:gpt-5.4",
+    "model": "gpt-5.5",
+    "id": "custom:droidproxy:gpt-5.5",
     "index": 3,
     "baseUrl": "http://localhost:8317/v1",
     "apiKey": "***",
-    "displayName": "DroidProxy: GPT 5.4",
+    "displayName": "DroidProxy: GPT 5.5",
     "maxOutputTokens": 128000,
     "provider": "openai"
   },

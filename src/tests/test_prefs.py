@@ -20,9 +20,9 @@ def test_defaults_match_macos_swift(store: PreferencesStore) -> None:
     assert snap.opus45_thinking_effort == "high"
     assert snap.sonnet46_thinking_effort == "high"
     assert snap.gpt53_codex_reasoning_effort == "high"
-    assert snap.gpt54_reasoning_effort == "high"
+    assert snap.gpt55_reasoning_effort == "high"
     assert snap.gpt53_codex_fast_mode is False
-    assert snap.gpt54_fast_mode is False
+    assert snap.gpt55_fast_mode is False
     assert snap.gemini31_pro_thinking_level == "high"
     assert snap.gemini3_flash_thinking_level == "high"
     assert snap.claude_max_budget_mode is False
@@ -86,11 +86,11 @@ def test_update_batch_applies_and_validates(store: PreferencesStore) -> None:
     store.update(
         {
             "sonnet46_thinking_effort": "max",
-            "gpt54_fast_mode": True,
+            "gpt55_fast_mode": True,
         }
     )
     assert store.get("sonnet46_thinking_effort") == "max"
-    assert store.get("gpt54_fast_mode") is True
+    assert store.get("gpt55_fast_mode") is True
 
 
 def test_malformed_toml_falls_back_to_defaults(tmp_path: Path) -> None:
@@ -118,6 +118,15 @@ def test_legacy_enabled_providers_dict_gets_new_keys_merged(tmp_path: Path) -> N
     assert providers["synthetic"] is True
     assert providers["kimi"] is True
     assert providers["fireworks"] is True
+
+
+def test_legacy_gpt54_preferences_migrate_to_gpt55(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text('gpt54_reasoning_effort = "xhigh"\ngpt54_fast_mode = true\n')
+    store = PreferencesStore(path=path)
+    snap = store.snapshot()
+    assert snap.gpt55_reasoning_effort == "xhigh"
+    assert snap.gpt55_fast_mode is True
 
 
 def test_direct_api_provider_toggles(store: PreferencesStore) -> None:

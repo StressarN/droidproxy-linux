@@ -6,4 +6,4 @@ port 8317 that injects thinking / reasoning / service_tier fields into
 Factory Droid requests.
 """
 
-__version__ = "1.8.16"
+__version__ = "1.8.17"

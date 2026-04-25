@@ -15,7 +15,7 @@ AppDir:
     id: io.automaze.droidproxy
     name: DroidProxy
     icon: droidproxy
-    version: "1.8.16"
+    version: "1.8.17"
     exec: usr/bin/python3.12
     exec_args: >-
       -E -s

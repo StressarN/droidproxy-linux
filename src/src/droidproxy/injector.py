@@ -105,8 +105,8 @@ def rewrite_model_value(body: str, *, old_model: str, new_model: str) -> str:
 def _codex_reasoning_effort(model: str, prefs: Preferences) -> str | None:
     if model == "gpt-5.3-codex":
         return prefs.gpt53_codex_reasoning_effort
-    if model == "gpt-5.4":
-        return prefs.gpt54_reasoning_effort
+    if model == "gpt-5.5":
+        return prefs.gpt55_reasoning_effort
     return None
 
 
@@ -347,8 +347,8 @@ def apply_fast_mode(body: str, path: str, prefs: Preferences) -> str | None:
     if not isinstance(parsed, dict):
         return None
     model = parsed.get("model")
-    if model == "gpt-5.4":
-        if not prefs.gpt54_fast_mode:
+    if model == "gpt-5.5":
+        if not prefs.gpt55_fast_mode:
             return None
     elif model == "gpt-5.3-codex":
         if not prefs.gpt53_codex_fast_mode:

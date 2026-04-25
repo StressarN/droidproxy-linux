@@ -19,13 +19,13 @@ Parity with the macOS app:
 - Claude adaptive thinking (`thinking: {"type":"adaptive"}`) plus per-model
   `output_config.effort` for Opus 4.7 and Sonnet 4.6.
 - Codex reasoning effort (`reasoning: {"effort":"..."}`) for `gpt-5.3-codex`
-  and `gpt-5.4`.
+  and `gpt-5.5`.
 - Gemini thinking levels for `gemini-3.1-pro-preview` and
   `gemini-3-flash-preview`.
 - Max Budget Mode for Sonnet 4.6 (classic extended thinking with
   `budget_tokens: 63999`, `max_tokens: 64000`, `effort: max`). Opus 4.7 is
   unaffected.
-- Fast mode `service_tier: priority` on `/v1/responses` for GPT 5.4 and
+- Fast mode `service_tier: priority` on `/v1/responses` for GPT 5.5 and
   GPT 5.3 Codex.
 - Amp CLI management passthrough to `https://ampcode.com` with Location
   and cookie-domain rewrites.

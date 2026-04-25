@@ -85,11 +85,11 @@ DROID_PROXY_MODELS: list[dict[str, Any]] = [
         "provider": "openai",
     },
     {
-        "model": "gpt-5.4",
-        "id": "custom:droidproxy:gpt-5.4",
+        "model": "gpt-5.5",
+        "id": "custom:droidproxy:gpt-5.5",
         "baseUrl": "http://localhost:8317/v1",
         "apiKey": "dummy-not-used",
-        "displayName": "DroidProxy: GPT 5.4",
+        "displayName": "DroidProxy: GPT 5.5",
         "maxOutputTokens": 128000,
         "noImageSupport": False,
         "provider": "openai",
@@ -231,7 +231,11 @@ ALL_DROID_PROXY_MODELS: list[dict[str, Any]] = [
 # IDs from previous DroidProxy releases that should be scrubbed during Apply
 # so users don't end up with stale entries next to the current ones.
 # Matches ``legacyDroidProxyModelIds`` in the Swift app.
-LEGACY_DROIDPROXY_MODEL_IDS: frozenset[str] = frozenset()
+LEGACY_DROIDPROXY_MODEL_IDS: frozenset[str] = frozenset(
+    {
+        "custom:droidproxy:gpt-5.4",
+    }
+)
 
 
 def install_challenger_droids(target_home: Path | None = None) -> dict[str, list[str]]:

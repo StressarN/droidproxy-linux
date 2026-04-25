@@ -28,7 +28,7 @@ OPUS_46_EFFORTS = ("low", "medium", "high", "max")
 OPUS_45_EFFORTS = ("low", "medium", "high", "max")
 SONNET_46_EFFORTS = ("low", "medium", "high", "max")
 GPT_53_CODEX_EFFORTS = ("low", "medium", "high", "xhigh")
-GPT_54_EFFORTS = ("low", "medium", "high", "xhigh")
+GPT_55_EFFORTS = ("low", "medium", "high", "xhigh")
 GEMINI_31_PRO_LEVELS = ("low", "medium", "high")
 GEMINI_3_FLASH_LEVELS = ("minimal", "low", "medium", "high")
 
@@ -40,9 +40,9 @@ class Preferences:
     opus45_thinking_effort: str = "high"
     sonnet46_thinking_effort: str = "high"
     gpt53_codex_reasoning_effort: str = "high"
-    gpt54_reasoning_effort: str = "high"
+    gpt55_reasoning_effort: str = "high"
     gpt53_codex_fast_mode: bool = False
-    gpt54_fast_mode: bool = False
+    gpt55_fast_mode: bool = False
     gemini31_pro_thinking_level: str = "high"
     gemini3_flash_thinking_level: str = "high"
     claude_max_budget_mode: bool = False
@@ -73,9 +73,14 @@ _VALID = {
     "opus45_thinking_effort": OPUS_45_EFFORTS,
     "sonnet46_thinking_effort": SONNET_46_EFFORTS,
     "gpt53_codex_reasoning_effort": GPT_53_CODEX_EFFORTS,
-    "gpt54_reasoning_effort": GPT_54_EFFORTS,
+    "gpt55_reasoning_effort": GPT_55_EFFORTS,
     "gemini31_pro_thinking_level": GEMINI_31_PRO_LEVELS,
     "gemini3_flash_thinking_level": GEMINI_3_FLASH_LEVELS,
+}
+
+_LEGACY_KEY_ALIASES = {
+    "gpt54_reasoning_effort": "gpt55_reasoning_effort",
+    "gpt54_fast_mode": "gpt55_fast_mode",
 }
 
 
@@ -121,6 +126,9 @@ class PreferencesStore:
                 self._prefs = Preferences()
                 return
             merged = asdict(Preferences())
+            for old_key, new_key in _LEGACY_KEY_ALIASES.items():
+                if new_key not in data and old_key in data:
+                    data[new_key] = data[old_key]
             for key, default in list(merged.items()):
                 if key in data:
                     coerced = _coerce(data[key], default)

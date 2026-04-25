@@ -108,17 +108,17 @@ On `POST` JSON bodies:
   `"output_config":{"effort":"..."}`, forces `"stream":true`. Effort from
   `Preferences.opus47_thinking_effort` /
   `Preferences.sonnet46_thinking_effort`.
-- Codex reasoning for exact models `gpt-5.3-codex` and `gpt-5.4`.
+- Codex reasoning for exact models `gpt-5.3-codex` and `gpt-5.5`.
   Injects `"reasoning":{"effort":"..."}`. Effort from
   `Preferences.gpt53_codex_reasoning_effort` /
-  `Preferences.gpt54_reasoning_effort`.
+  `Preferences.gpt55_reasoning_effort`.
 - Gemini thinking for `gemini-3.1-pro-preview` and
   `gemini-3-flash-preview`. Injects
   `"generationConfig":{"thinkingConfig":{"thinking_level":"..."}}`.
   Level from `Preferences.gemini31_pro_thinking_level` /
   `Preferences.gemini3_flash_thinking_level`.
 - Fast mode: injects `"service_tier":"priority"` when
-  `/v1/responses` or `/api/v1/responses` hit with `gpt-5.4` /
+  `/v1/responses` or `/api/v1/responses` hit with `gpt-5.5` /
   `gpt-5.3-codex`, matching `*_fast_mode` pref on, and
   client didn't set `service_tier`.
 - Max Budget Mode: if `Preferences.claude_max_budget_mode` on,
@@ -198,11 +198,11 @@ changing invalidates user installs):
 | `opus47_thinking_effort` | `xhigh` | `low/medium/high/xhigh/max` |
 | `sonnet46_thinking_effort` | `high` | `low/medium/high/max` |
 | `gpt53_codex_reasoning_effort` | `high` | `low/medium/high/xhigh` |
-| `gpt54_reasoning_effort` | `high` | `low/medium/high/xhigh` |
+| `gpt55_reasoning_effort` | `high` | `low/medium/high/xhigh` |
 | `gemini31_pro_thinking_level` | `high` | `low/medium/high` |
 | `gemini3_flash_thinking_level` | `high` | `minimal/low/medium/high` |
 | `gpt53_codex_fast_mode` | `false` | bool |
-| `gpt54_fast_mode` | `false` | bool |
+| `gpt55_fast_mode` | `false` | bool |
 | `claude_max_budget_mode` | `false` | bool |
 | `allow_remote` | `false` | bool |
 | `secret_key` | `""` | string |

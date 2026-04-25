@@ -369,7 +369,7 @@ class WebUI:
                 "gpt53_codex_reasoning_effort": list(
                     _EFFORT_OPTIONS["gpt53_codex_reasoning_effort"]
                 ),
-                "gpt54_reasoning_effort": list(_EFFORT_OPTIONS["gpt54_reasoning_effort"]),
+                "gpt55_reasoning_effort": list(_EFFORT_OPTIONS["gpt55_reasoning_effort"]),
                 "gemini31_pro_thinking_level": list(
                     _EFFORT_OPTIONS["gemini31_pro_thinking_level"]
                 ),
@@ -386,7 +386,7 @@ _EFFORT_OPTIONS = {
     "opus45_thinking_effort": ("low", "medium", "high", "max"),
     "sonnet46_thinking_effort": ("low", "medium", "high", "max"),
     "gpt53_codex_reasoning_effort": ("low", "medium", "high", "xhigh"),
-    "gpt54_reasoning_effort": ("low", "medium", "high", "xhigh"),
+    "gpt55_reasoning_effort": ("low", "medium", "high", "xhigh"),
     "gemini31_pro_thinking_level": ("low", "medium", "high"),
     "gemini3_flash_thinking_level": ("minimal", "low", "medium", "high"),
 }

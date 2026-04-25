@@ -115,8 +115,9 @@ def test_apply_removes_legacy_and_cc_namespace(fake_home: Path) -> None:
             {
                 "customModels": [
                     {"id": "custom:droidproxy:opus-4-7", "index": 0, "model": "x"},
-                    {"id": "custom:CC:old-plugin", "index": 1, "model": "x"},
-                    {"id": "custom:mine:keep", "index": 2, "model": "x"},
+                    {"id": "custom:droidproxy:gpt-5.4", "index": 1, "model": "x"},
+                    {"id": "custom:CC:old-plugin", "index": 2, "model": "x"},
+                    {"id": "custom:mine:keep", "index": 3, "model": "x"},
                 ]
             }
         )
@@ -127,12 +128,15 @@ def test_apply_removes_legacy_and_cc_namespace(fake_home: Path) -> None:
     # Prior DroidProxy entry gets removed and re-added via current DROID_PROXY_MODELS,
     # not the stale ``model: "x"`` entry. The CC namespace is scrubbed entirely.
     assert "custom:CC:old-plugin" not in ids
+    assert "custom:droidproxy:gpt-5.4" not in ids
+    assert "custom:droidproxy:gpt-5.5" in ids
     assert "custom:mine:keep" in ids
     droidproxy_entry = next(
         m for m in settings["customModels"] if m["id"] == "custom:droidproxy:opus-4-7"
     )
     assert droidproxy_entry["model"] == "claude-opus-4-7"
     assert "custom:droidproxy:opus-4-7" in result["removed"]
+    assert "custom:droidproxy:gpt-5.4" in result["removed"]
     assert "custom:CC:old-plugin" in result["removed"]
 
 
@@ -143,10 +147,10 @@ def test_apply_skips_disabled_providers(fake_home: Path) -> None:
     )
     ids = [m["id"] for m in _read_settings(fake_home)["customModels"]]
     assert "custom:droidproxy:opus-4-7" in ids
-    assert "custom:droidproxy:gpt-5.4" not in ids
+    assert "custom:droidproxy:gpt-5.5" not in ids
     assert "custom:droidproxy:gpt-5.3-codex" not in ids
     assert "custom:droidproxy:gemini-3.1-pro" in ids
-    assert "custom:droidproxy:gpt-5.4" in result["skipped"]
+    assert "custom:droidproxy:gpt-5.5" in result["skipped"]
 
 
 def test_factory_custom_models_installed_false_when_missing(fake_home: Path) -> None:

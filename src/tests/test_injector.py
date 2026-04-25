@@ -67,8 +67,8 @@ def test_replace_object_value() -> None:
 
 
 def test_replace_or_inject_dispatches_on_exists_flag() -> None:
-    without = '{"model":"gpt-5.4"}'
-    with_field = '{"model":"gpt-5.4","reasoning":"old"}'
+    without = '{"model":"gpt-5.5"}'
+    with_field = '{"model":"gpt-5.5","reasoning":"old"}'
 
     injected = replace_or_inject_json_field(
         without,
@@ -85,8 +85,8 @@ def test_replace_or_inject_dispatches_on_exists_flag() -> None:
         exists=True,
     )
 
-    assert injected == '{"model":"gpt-5.4","reasoning":{"effort":"high"}}'
-    assert replaced == '{"model":"gpt-5.4","reasoning":{"effort":"high"}}'
+    assert injected == '{"model":"gpt-5.5","reasoning":{"effort":"high"}}'
+    assert replaced == '{"model":"gpt-5.5","reasoning":{"effort":"high"}}'
 
 
 def test_rewrite_model_value() -> None:
@@ -218,11 +218,18 @@ def test_existing_stream_is_replaced_not_duplicated() -> None:
     assert '"stream":true' in outcome.body
 
 
-def test_codex_reasoning_gpt_54() -> None:
-    body = '{"model":"gpt-5.4","input":"hi"}'
-    outcome = apply_thinking_injection(body, _prefs(gpt54_reasoning_effort="high"))
+def test_codex_reasoning_gpt_55() -> None:
+    body = '{"model":"gpt-5.5","input":"hi"}'
+    outcome = apply_thinking_injection(body, _prefs(gpt55_reasoning_effort="high"))
     assert outcome.kind == "codex_reasoning"
-    assert outcome.body == '{"model":"gpt-5.4","reasoning":{"effort":"high"},"input":"hi"}'
+    assert outcome.body == '{"model":"gpt-5.5","reasoning":{"effort":"high"},"input":"hi"}'
+
+
+def test_codex_reasoning_gpt_54_is_no_longer_targeted() -> None:
+    body = '{"model":"gpt-5.4","input":"hi"}'
+    outcome = apply_thinking_injection(body, _prefs(gpt55_reasoning_effort="high"))
+    assert outcome.kind == "none"
+    assert outcome.body == body
 
 
 def test_codex_reasoning_gpt_53_codex() -> None:
@@ -284,16 +291,16 @@ def test_non_ascii_body_preserved() -> None:
 # --- fast-mode branch --------------------------------------------------------
 
 
-def test_fast_mode_injected_for_gpt_54_on_responses_path() -> None:
-    body = '{"model":"gpt-5.4","input":"hi"}'
-    result = apply_fast_mode(body, "/v1/responses", _prefs(gpt54_fast_mode=True))
-    assert result == '{"model":"gpt-5.4","service_tier":"priority","input":"hi"}'
+def test_fast_mode_injected_for_gpt_55_on_responses_path() -> None:
+    body = '{"model":"gpt-5.5","input":"hi"}'
+    result = apply_fast_mode(body, "/v1/responses", _prefs(gpt55_fast_mode=True))
+    assert result == '{"model":"gpt-5.5","service_tier":"priority","input":"hi"}'
 
 
 def test_fast_mode_honours_query_string_in_path() -> None:
-    body = '{"model":"gpt-5.4","input":"hi"}'
-    result = apply_fast_mode(body, "/v1/responses?stream=true", _prefs(gpt54_fast_mode=True))
-    assert result == '{"model":"gpt-5.4","service_tier":"priority","input":"hi"}'
+    body = '{"model":"gpt-5.5","input":"hi"}'
+    result = apply_fast_mode(body, "/v1/responses?stream=true", _prefs(gpt55_fast_mode=True))
+    assert result == '{"model":"gpt-5.5","service_tier":"priority","input":"hi"}'
 
 
 def test_fast_mode_injected_for_gpt_53_codex() -> None:
@@ -305,15 +312,15 @@ def test_fast_mode_injected_for_gpt_53_codex() -> None:
 
 
 def test_fast_mode_skipped_when_preference_off() -> None:
-    body = '{"model":"gpt-5.4","input":"hi"}'
-    assert apply_fast_mode(body, "/v1/responses", _prefs(gpt54_fast_mode=False)) is None
+    body = '{"model":"gpt-5.5","input":"hi"}'
+    assert apply_fast_mode(body, "/v1/responses", _prefs(gpt55_fast_mode=False)) is None
 
 
 def test_fast_mode_skipped_on_non_responses_path() -> None:
-    body = '{"model":"gpt-5.4","input":"hi"}'
-    assert apply_fast_mode(body, "/v1/chat/completions", _prefs(gpt54_fast_mode=True)) is None
+    body = '{"model":"gpt-5.5","input":"hi"}'
+    assert apply_fast_mode(body, "/v1/chat/completions", _prefs(gpt55_fast_mode=True)) is None
 
 
 def test_fast_mode_skipped_when_service_tier_already_present() -> None:
-    body = '{"model":"gpt-5.4","service_tier":"priority","input":"hi"}'
-    assert apply_fast_mode(body, "/v1/responses", _prefs(gpt54_fast_mode=True)) is None
+    body = '{"model":"gpt-5.5","service_tier":"priority","input":"hi"}'
+    assert apply_fast_mode(body, "/v1/responses", _prefs(gpt55_fast_mode=True)) is None

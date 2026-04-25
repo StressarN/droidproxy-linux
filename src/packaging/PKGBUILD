@@ -1,6 +1,6 @@
 # Maintainer: StressarN <martin.gustavsen@kreatell.com>
 pkgname=droidproxy-linux
-pkgver=1.8.16
+pkgver=1.8.17
 pkgrel=1
 pkgdesc="Proxy Claude, Codex, and Gemini subscriptions for Factory Droid CLI (Linux port)"
 arch=('any')
