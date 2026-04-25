@@ -200,7 +200,7 @@ class PreferencesStore:
 
         Only the OAuth-routed providers map here (claude, codex, gemini); the
         direct-API services (synthetic, kimi, fireworks) don't go through
-        CLIProxyAPIPlus so they have no ``oauth-excluded`` entry.
+        CLIProxyAPI so they have no ``oauth-excluded`` entry.
         """
         mapping = {"claude": "claude", "codex": "codex", "gemini": "gemini-cli"}
         with self._lock:

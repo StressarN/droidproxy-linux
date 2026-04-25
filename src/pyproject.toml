@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "droidproxy"
-version = "1.8.15"
+version = "1.8.16"
 description = "Linux port of DroidProxy: proxy Claude/Codex/Gemini subscriptions for Factory Droid CLI with thinking/reasoning injection."
 readme = "README.md"
 requires-python = ">=3.11"

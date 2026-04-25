@@ -1,4 +1,4 @@
-"""HTTP proxy that sits in front of the cli-proxy-api-plus Go binary.
+"""HTTP proxy that sits in front of the cli-proxy-api Go binary.
 
 This is a port of ``src/Sources/ThinkingProxy.swift`` onto aiohttp. Behaviour
 parity is intentional: same port, same path rewrites, same Amp CLI handling,

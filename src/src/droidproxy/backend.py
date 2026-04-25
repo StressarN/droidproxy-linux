@@ -1,10 +1,10 @@
-"""Manage the upstream ``cli-proxy-api-plus`` subprocess.
+"""Manage the upstream ``cli-proxy-api`` subprocess.
 
 Port of the macOS ``ServerManager.swift`` class. Responsibilities:
 
 * Merge the bundled ``config.yaml`` with user preferences and write the
   result to ``~/.cli-proxy-api/merged-config.yaml`` (0600).
-* Spawn ``cli-proxy-api-plus -config <merged>`` on port 8318, streaming its
+* Spawn ``cli-proxy-api -config <merged>`` on port 8318, streaming its
   stdout/stderr into a bounded log ring buffer.
 * Gracefully stop the process on shutdown (SIGTERM, then SIGKILL after a
   short grace period).
@@ -68,7 +68,7 @@ LogCallback = Callable[[list[str]], Awaitable[None] | None]
 
 
 class ServerManager:
-    """Lifecycle for the ``cli-proxy-api-plus`` Go process."""
+    """Lifecycle for the ``cli-proxy-api`` Go process."""
 
     _PROVIDER_OAUTH_KEYS = {"claude": "claude", "codex": "codex", "gemini": "gemini-cli"}
 
@@ -111,13 +111,13 @@ class ServerManager:
 
             if not self._binary_path.exists():
                 self._log(
-                    f"Error: cli-proxy-api-plus binary not found at {self._binary_path}"
+                    f"Error: cli-proxy-api binary not found at {self._binary_path}"
                 )
                 return False
 
             await self._kill_orphans()
             config_path = self._write_merged_config()
-            self._log(f"Starting cli-proxy-api-plus on port {self.port}")
+            self._log(f"Starting cli-proxy-api on port {self.port}")
             try:
                 self._process = await asyncio.create_subprocess_exec(
                     str(self._binary_path),
@@ -186,7 +186,7 @@ class ServerManager:
             self._log("Server stopped")
 
     async def run_auth_command(self, command: AuthCommand) -> AuthOutcome:
-        """Spawn ``cli-proxy-api-plus`` with an auth flag and return the outcome.
+        """Spawn ``cli-proxy-api`` with an auth flag and return the outcome.
 
         Mirrors the Swift helper that replies with "\\n" after 12 s to unstick
         the Codex callback prompt, and "2\\n" after 20 s to select Google One
@@ -342,7 +342,7 @@ class ServerManager:
             raise
 
     async def _kill_orphans(self) -> None:
-        """Terminate any ``cli-proxy-api-plus`` instances from previous crashes."""
+        """Terminate any ``cli-proxy-api`` instances from previous crashes."""
 
         def _iter_orphans() -> Iterable[psutil.Process]:
             for proc in psutil.process_iter(["pid", "name", "cmdline"]):
@@ -350,7 +350,7 @@ class ServerManager:
                     name = proc.info.get("name") or ""
                     cmdline = proc.info.get("cmdline") or []
                     combined = f"{name} {' '.join(cmdline)}"
-                    if "cli-proxy-api-plus" in combined:
+                    if "cli-proxy-api" in combined or "cli-proxy-api-plus" in combined:
                         yield proc
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue

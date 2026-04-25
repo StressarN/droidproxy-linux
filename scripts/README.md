@@ -261,7 +261,7 @@ rm -rf ~/.local/bin/droidproxy
 | Workflow | Triggered by | What it produces |
 |---|---|---|
 | `linux-release.yml` | `v*` tag push or manual dispatch | Wheel + sdist in PyPI-ready format, plus `DroidProxyLinux-{x86_64,aarch64}.AppImage` (+ `.zsync`), attached to the GitHub release |
-| `update-cliproxyapi-linux.yml` | 12-hour cron + manual dispatch | PR that bumps `PINNED_VERSION` in `src/src/droidproxy/binary.py` when upstream `router-for-me/CLIProxyAPIPlus` cuts a new release |
+| `update-cliproxyapi-linux.yml` | 12-hour cron + manual dispatch | PR that bumps `PINNED_VERSION` in `src/src/droidproxy/binary.py` when upstream `router-for-me/CLIProxyAPI` cuts a new release |
 
 The scripts here do **not** invoke CI; they just rely on its outputs
 (`--bin` needs AppImages on the release page). If CI fails or hasn't

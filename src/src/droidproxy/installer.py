@@ -13,7 +13,7 @@ Two public helpers:
 
 The Factory ``customModels`` list covers two classes of models:
 
-1. **OAuth-via-CLIProxyAPIPlus** (``claude``, ``codex``, ``gemini``) -- these
+1. **OAuth-via-CLIProxyAPI** (``claude``, ``codex``, ``gemini``) -- these
    point at ``http://localhost:8317`` / ``/v1`` so they hit the ThinkingProxy
    and inherit the injected thinking/reasoning params. ``apiKey`` is
    ``dummy-not-used``.

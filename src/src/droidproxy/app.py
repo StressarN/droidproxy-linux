@@ -99,7 +99,7 @@ async def _start_services(
             await asyncio.to_thread(binary.ensure_installed)
         except binary.BinaryError as err:
             log.warning(
-                "Could not install cli-proxy-api-plus automatically: %s", err
+                "Could not install cli-proxy-api automatically: %s", err
             )
     await context.start()
     await web.start()

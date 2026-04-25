@@ -1,8 +1,8 @@
-"""Download, verify, and manage the upstream ``cli-proxy-api-plus`` binary.
+"""Download, verify, and manage the upstream ``cli-proxy-api`` binary.
 
 Upstream publishes release tarballs at
-``https://github.com/router-for-me/CLIProxyAPIPlus/releases/`` with names like
-``CLIProxyAPIPlus_<version>_linux_amd64.tar.gz`` and a ``checksums.txt``. We
+``https://github.com/router-for-me/CLIProxyAPI/releases/`` with names like
+``CLIProxyAPI_<version>_linux_amd64.tar.gz`` and a ``checksums.txt``. We
 pin the version in this module so builds are reproducible; the
 ``update-cliproxyapi-linux.yml`` workflow bumps that pin automatically.
 """
@@ -23,10 +23,10 @@ from droidproxy.paths import binary_dir, cli_proxy_api_binary
 
 log = logging.getLogger(__name__)
 
-PINNED_VERSION = "6.9.28-0"
-GITHUB_REPO = "router-for-me/CLIProxyAPIPlus"
+PINNED_VERSION = "6.9.37"
+GITHUB_REPO = "router-for-me/CLIProxyAPI"
 RELEASE_URL_TEMPLATE = (
-    "https://github.com/router-for-me/CLIProxyAPIPlus/releases/download/v{version}/{asset}"
+    "https://github.com/router-for-me/CLIProxyAPI/releases/download/v{version}/{asset}"
 )
 USER_AGENT = "droidproxy-linux/1.0 (+https://github.com/StressarN/droidproxy-linux)"
 
@@ -37,7 +37,12 @@ _ARCH_MAP = {
     "arm64": "arm64",
 }
 
-_CANDIDATE_NAMES = ("CLIProxyAPIPlus", "cli-proxy-api-plus")
+_CANDIDATE_NAMES = (
+    "CLIProxyAPI",
+    "cli-proxy-api",
+    "CLIProxyAPIPlus",
+    "cli-proxy-api-plus",
+)
 
 
 class BinaryError(RuntimeError):
@@ -65,7 +70,7 @@ def detect_arch() -> str:
 
 def asset_name(version: str = PINNED_VERSION, arch: str | None = None) -> str:
     arch = arch or detect_arch()
-    return f"CLIProxyAPIPlus_{version}_linux_{arch}.tar.gz"
+    return f"CLIProxyAPI_{version}_linux_{arch}.tar.gz"
 
 
 def release_url(version: str = PINNED_VERSION, arch: str | None = None) -> str:
@@ -147,7 +152,7 @@ def _extract_binary(tarball: bytes, destination: Path) -> Path:
                         break
             if picked is None:
                 raise BinaryError(
-                    "Could not locate the cli-proxy-api-plus binary inside the release tarball"
+                    "Could not locate the cli-proxy-api binary inside the release tarball"
                 )
             tar.extract(picked, path=tmp_path, filter="data")
             extracted = tmp_path / picked.name
@@ -172,7 +177,7 @@ def install(
     """
     target = cli_proxy_api_binary()
     if target.exists() and not force:
-        log.info("cli-proxy-api-plus already installed at %s", target)
+        log.info("cli-proxy-api already installed at %s", target)
         return current_status()
 
     binary_dir()  # ensure directory exists
@@ -189,7 +194,7 @@ def install(
     verify_sha256(tarball, checksums[asset])
 
     _extract_binary(tarball, target)
-    log.info("Installed cli-proxy-api-plus %s at %s", version, target)
+    log.info("Installed cli-proxy-api %s at %s", version, target)
     return current_status()
 
 

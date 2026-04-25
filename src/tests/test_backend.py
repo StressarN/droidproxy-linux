@@ -52,7 +52,7 @@ def test_merged_config_reflects_prefs(
     )
     prefs_store.set_provider_enabled("codex", False)
 
-    binary = _write_fake_binary(tmp_path / "cli-proxy-api-plus", "#!/bin/sh\nsleep 0.1\n")
+    binary = _write_fake_binary(tmp_path / "cli-proxy-api", "#!/bin/sh\nsleep 0.1\n")
     manager = ServerManager(prefs_store=prefs_store, binary_path=binary)
     merged = manager.get_merged_config_path()
 
@@ -76,7 +76,7 @@ async def test_start_and_stop_subprocess(
         'echo "ready"\n'
         "while true; do sleep 0.2; done\n"
     )
-    binary = _write_fake_binary(tmp_path / "cli-proxy-api-plus", script)
+    binary = _write_fake_binary(tmp_path / "cli-proxy-api", script)
     manager = ServerManager(prefs_store=prefs_store, binary_path=binary)
 
     started = await manager.start()
@@ -113,7 +113,7 @@ async def test_auth_flow_success_when_binary_exits_zero(
         'echo "Opening browser for Claude login"\n'
         "exit 0\n"
     )
-    binary = _write_fake_binary(tmp_path / "cli-proxy-api-plus", script)
+    binary = _write_fake_binary(tmp_path / "cli-proxy-api", script)
     manager = ServerManager(prefs_store=prefs_store, binary_path=binary)
 
     outcome = await manager.run_auth_command(AuthCommand.CLAUDE)
@@ -130,7 +130,7 @@ async def test_auth_flow_failure_when_binary_errors(
         'echo "boom" >&2\n'
         "exit 3\n"
     )
-    binary = _write_fake_binary(tmp_path / "cli-proxy-api-plus", script)
+    binary = _write_fake_binary(tmp_path / "cli-proxy-api", script)
     manager = ServerManager(prefs_store=prefs_store, binary_path=binary)
 
     outcome = await manager.run_auth_command(AuthCommand.CLAUDE)

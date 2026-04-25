@@ -41,12 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--upstream-port",
         type=int,
         default=8318,
-        help="Port for the cli-proxy-api-plus backend. Default: 8318.",
+        help="Port for the cli-proxy-api backend. Default: 8318.",
     )
     parser.add_argument(
         "--no-auto-download",
         action="store_true",
-        help="Do not download the cli-proxy-api-plus binary on first run.",
+        help="Do not download the cli-proxy-api binary on first run.",
     )
 
     sub = parser.add_subparsers(dest="command")
@@ -90,7 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "install-models",
         help="Apply DroidProxy custom models to ~/.factory/settings.json.",
     )
-    sub.add_parser("install-binary", help="(Re)download cli-proxy-api-plus.")
+    sub.add_parser("install-binary", help="(Re)download cli-proxy-api.")
     sub.add_parser("doctor", help="Run health checks and print diagnostics.")
     sub.add_parser("check-update", help="Check for a newer DroidProxy release.")
     sub.add_parser("paths", help="Print the XDG paths DroidProxy uses.")
@@ -330,9 +330,9 @@ def _install_binary() -> int:
     try:
         status = binary.install(force=True)
     except binary.BinaryError as err:
-        print(f"Failed to install cli-proxy-api-plus: {err}", file=sys.stderr)
+        print(f"Failed to install cli-proxy-api: {err}", file=sys.stderr)
         return 1
-    print(f"Installed cli-proxy-api-plus {status.version} ({status.size} bytes) at {status.path}")
+    print(f"Installed cli-proxy-api {status.version} ({status.size} bytes) at {status.path}")
     return 0
 
 
@@ -347,9 +347,9 @@ def _doctor(options: AppOptions) -> int:
 
     status = binary.current_status()
     if status.exists:
-        print(f"cli-proxy-api-plus: OK ({status.size} bytes at {status.path})")
+        print(f"cli-proxy-api: OK ({status.size} bytes at {status.path})")
     else:
-        print(f"cli-proxy-api-plus: MISSING ({status.path})")
+        print(f"cli-proxy-api: MISSING ({status.path})")
 
     cf = find_cloudflared()
     print(f"cloudflared:        {'OK (' + str(cf) + ')' if cf else 'MISSING (tunnel disabled)'}")

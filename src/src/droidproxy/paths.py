@@ -1,6 +1,6 @@
 """XDG-compliant filesystem paths used by DroidProxy.
 
-The upstream ``cli-proxy-api-plus`` binary stores OAuth credentials under
+The upstream ``cli-proxy-api`` binary stores OAuth credentials under
 ``~/.cli-proxy-api`` on every platform, so we keep that path as-is to stay
 compatible. Everything else lives under the standard XDG base directories.
 """
@@ -45,15 +45,15 @@ def cache_dir() -> Path:
 
 
 def binary_dir() -> Path:
-    """Where the ``cli-proxy-api-plus`` binary is installed."""
+    """Where the ``cli-proxy-api`` binary is installed."""
     path = data_dir() / "bin"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def cli_proxy_api_binary() -> Path:
-    """Path to the bundled ``cli-proxy-api-plus`` binary."""
-    return binary_dir() / "cli-proxy-api-plus"
+    """Path to the bundled ``cli-proxy-api`` binary."""
+    return binary_dir() / "cli-proxy-api"
 
 
 def auth_dir() -> Path:

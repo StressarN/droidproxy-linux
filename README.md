@@ -3,11 +3,11 @@
 A Linux port of [DroidProxy](https://github.com/anand-92/droidproxy) -- the
 native macOS menu bar app that proxies Claude Code, Codex, and Gemini
 subscriptions for Factory Droid. Built on
-[CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus).
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 
 ## What you get
 
-A Python daemon that spawns `cli-proxy-api-plus` on `127.0.0.1:8318` and a
+A Python daemon that spawns `cli-proxy-api` on `127.0.0.1:8318` and a
 thinking/reasoning proxy on `127.0.0.1:8317`. A GTK tray icon
 (AyatanaAppIndicator3) stays in the system tray and a local web UI on
 `http://127.0.0.1:8316` exposes settings, account management, and live
@@ -115,7 +115,7 @@ droidproxy                # Start tray + daemon + web UI (default)
 droidproxy daemon         # Headless (no tray)
 droidproxy doctor         # Health check for paths, GTK, cloudflared
 droidproxy install-droids # Copy Challenger Droid configs into ~/.factory/
-droidproxy install-binary # (Re)download the cli-proxy-api-plus backend
+droidproxy install-binary # (Re)download the cli-proxy-api backend
 droidproxy check-update   # Compare installed vs latest release
 droidproxy paths          # Print the XDG dirs DroidProxy uses
 ```

@@ -28,23 +28,23 @@ def test_detect_arch_rejects_unsupported(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_asset_name_and_url_format() -> None:
-    assert asset_name("1.2.3-0", arch="amd64") == "CLIProxyAPIPlus_1.2.3-0_linux_amd64.tar.gz"
+    assert asset_name("1.2.3", arch="amd64") == "CLIProxyAPI_1.2.3_linux_amd64.tar.gz"
     assert release_url("1.2.3-0", arch="amd64").endswith(
-        "/releases/download/v1.2.3-0/CLIProxyAPIPlus_1.2.3-0_linux_amd64.tar.gz"
+        "/releases/download/v1.2.3-0/CLIProxyAPI_1.2.3-0_linux_amd64.tar.gz"
     )
 
 
 def test_parse_checksums_handles_star_prefix_and_comments() -> None:
     text = (
         "# comment line\n"
-        "abc123  CLIProxyAPIPlus_1.0_linux_amd64.tar.gz\n"
-        "deadbeef *CLIProxyAPIPlus_1.0_linux_arm64.tar.gz\n"
+        "abc123  CLIProxyAPI_1.0_linux_amd64.tar.gz\n"
+        "deadbeef *CLIProxyAPI_1.0_linux_arm64.tar.gz\n"
         "\n"
     )
     parsed = _parse_checksums(text)
     assert parsed == {
-        "CLIProxyAPIPlus_1.0_linux_amd64.tar.gz": "abc123",
-        "CLIProxyAPIPlus_1.0_linux_arm64.tar.gz": "deadbeef",
+        "CLIProxyAPI_1.0_linux_amd64.tar.gz": "abc123",
+        "CLIProxyAPI_1.0_linux_arm64.tar.gz": "deadbeef",
     }
 
 

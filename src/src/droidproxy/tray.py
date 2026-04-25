@@ -6,7 +6,7 @@ Mirrors the NSStatusItem menu in ``src/Sources/AppDelegate.swift``:
 * Open Settings (launches default browser to the web UI URL)
 * Start / Stop Server
 * Copy Server URL
-* Open Dashboard (cli-proxy-api-plus management UI on :8318)
+* Open Dashboard (cli-proxy-api management UI on :8318)
 * Check for Updates
 * Quit
 
