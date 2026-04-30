@@ -23,7 +23,7 @@ from droidproxy.paths import binary_dir, cli_proxy_api_binary
 
 log = logging.getLogger(__name__)
 
-PINNED_VERSION = "6.9.37"
+PINNED_VERSION = "6.9.45"
 GITHUB_REPO = "router-for-me/CLIProxyAPI"
 RELEASE_URL_TEMPLATE = (
     "https://github.com/router-for-me/CLIProxyAPI/releases/download/v{version}/{asset}"
