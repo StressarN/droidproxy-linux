@@ -33,8 +33,8 @@ USER_AGENT = "droidproxy-linux/1.0 (+https://github.com/StressarN/droidproxy-lin
 _ARCH_MAP = {
     "x86_64": "amd64",
     "amd64": "amd64",
-    "aarch64": "arm64",
-    "arm64": "arm64",
+    "aarch64": "aarch64",
+    "arm64": "aarch64",
 }
 
 _CANDIDATE_NAMES = (
