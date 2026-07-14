@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> **Workspace HTTP policy:** New or materially changed vendor REST integrations must use a project-local HTTP base client, not a runtime SDK. See the [canonical policy](https://github.com/Kreatell/codex/blob/main/HTTP_CLIENT_POLICY.md).
+
 ## Build & Run
 
 Package in `src/`, standard Python src-layout

@@ -1,5 +1,7 @@
 # DroidProxy Linux
 
+> **Workspace HTTP policy:** New or materially changed vendor REST integrations must use a project-local HTTP base client, not a runtime SDK. See the [canonical policy](https://github.com/Kreatell/codex/blob/main/HTTP_CLIENT_POLICY.md).
+
 A Linux port of [DroidProxy](https://github.com/anand-92/droidproxy) -- the
 native macOS menu bar app that proxies Claude Code, Codex, and Gemini
 subscriptions for Factory Droid. Built on
